@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — S2: WordPiece tokenizer (2026-10-16)
+
+- `katakuri::tokenizer`: bespoke BERT-class WordPiece engine, replacing
+  the `tokenizers` crate dependency for Ijima's embedding surface.
+  Pipeline transcribed from tokenizers-0.21.4: raw added-token split
+  (leftmost, longest-first), BertNormalizer (clean_text → CJK spacing →
+  NFD accent strip following `lowercase` → lowercase), BertPreTokenizer
+  (whitespace split + punctuation isolation), greedy longest-match
+  WordPiece with `##` continuations, LongestFirst truncation reserving
+  the two special slots, `[CLS] … [SEP]` wrapping, BatchLongest
+  right-padding.
+- Constructors: `from_tokenizer_json` (strict BERT-class subset —
+  unsupported kinds reject with typed errors, never silent divergence)
+  and `from_bert_vocab_txt` (BERT defaults).
+- Golden-vector parity: 26 singles + 3 batch goldens generated from the
+  real MiniLM tokenizer with Ijima's exact call shape
+  (`tests/fixtures/`, tokenizers 0.21.4); vocab fixture committed so CI
+  replays parity without network.
+- Dependencies: `unicode-normalization 0.1` (NFD) and
+  `unicode_categories 0.1` (is_other/is_mark_nonspacing/is_punctuation)
+  — the reference implementation's own Unicode tables.
+
 ### Added — S1: safetensors parse/validate (2026-10-16)
 
 - `katakuri::safetensors`: `SafeTensors::parse` — zero-copy, fully

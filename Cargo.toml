@@ -26,6 +26,10 @@ zunesha = "0.1.2"
 # Verification stack, feature-gated per the Borsalino pattern.
 karpal-verify = { version = "0.6.1", optional = true }
 karpal-proof = { version = "0.6.1", optional = true }
+# Unicode tables the tokenizers reference implementation itself uses —
+# parity requires identical category tables and NFD.
+unicode-normalization = "0.1"
+unicode_categories = "0.1"
 
 # NOTE: Katakuri never computes — no forward passes, no autodiff, no optimizers,
 # no kernels, no shader compilation. That boundary is the architectural contract
@@ -37,6 +41,9 @@ karpal-proof = { version = "0.6.1", optional = true }
 # - zunesha 0.1.2: device upload + NoDevice host path (the substrate)
 # - karpal-verify/proof 0.6.1: verify-feature obligations (Borsalino pattern,
 #   pinned to Borsalino's own pin)
+# - unicode-normalization 0.1: NFD for accent stripping (S2 tokenizer)
+# - unicode_categories 0.1: is_other/is_mark_nonspacing/is_punctuation
+#   predicates (S2 tokenizer; the reference implementation's own crate)
 
 # Declare the `kani` cfg so `#[cfg(kani)]` (lib.rs module gate) does not trip
 # rustc's `unexpected_cfgs` lint under `-D warnings`. Inert outside Kani.

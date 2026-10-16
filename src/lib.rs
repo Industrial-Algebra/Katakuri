@@ -37,7 +37,7 @@
 //!   Replaces candle's `VarBuilder` and safetensors glue. Slice S1.
 //! - [`tokenizer`] — WordPiece (BERT-class) tokenization matching Ijima's
 //!   exact tokenization contract, with golden-vector parity against HF
-//!   tokenizers. Replaces the `tokenizers` crate dependency. Lands with S2.
+//!   tokenizers 0.21.x (S2). Replaces the `tokenizers` crate dependency.
 //! - [`model`] — architecture specs as typed data: BERT config (layers /
 //!   heads / dims / hidden act), named-tensor layout manifests. Replaces
 //!   candle-transformers `models::bert`. Lands with S3.
