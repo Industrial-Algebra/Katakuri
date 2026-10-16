@@ -385,7 +385,9 @@ impl Tokenizer {
                         (Some(ids), Some(tokens))
                             if !ids.is_empty()
                                 && ids.len() == tokens.len()
-                                && ids.iter().all(|i| i.as_u64().is_some())
+                                && ids.iter().all(|i| {
+                                    i.as_u64().is_some_and(|x| u32::try_from(x).is_ok())
+                                })
                                 && tokens.iter().all(|t| t.as_str().is_some()) =>
                         {
                             (ids, tokens)
@@ -1180,6 +1182,17 @@ mod tests {
             "[CLS]": {"ids": [2], "tokens": ["[CLS]"]},
             "[SEP]": {"ids": [3], "tokens": ["[SEP]"]},
             "[MASK]": 3
+        });
+        assert!(matches!(
+            from_json(&v),
+            Err(KatakuriError::InvalidTokenizerJson { .. })
+        ));
+        // IDs above u32::MAX reject (HF deserializes ids as Vec<u32>).
+        let mut v = tiny_json();
+        v["post_processor"]["special_tokens"] = json!({
+            "[CLS]": {"ids": [2], "tokens": ["[CLS]"]},
+            "[SEP]": {"ids": [3], "tokens": ["[SEP]"]},
+            "[MASK]": {"ids": [4294967296u64], "tokens": ["[MASK]"]}
         });
         assert!(matches!(
             from_json(&v),
