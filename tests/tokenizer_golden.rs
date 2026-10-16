@@ -70,7 +70,7 @@ fn ids_of(v: &serde_json::Value) -> Vec<u32> {
     v.as_array()
         .expect("ids array")
         .iter()
-        .map(|x| x.as_u64().expect("u32 id") as u32)
+        .map(|x| u32::try_from(x.as_u64().expect("u32 id")).expect("u32 id"))
         .collect()
 }
 

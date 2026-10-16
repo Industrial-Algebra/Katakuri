@@ -295,6 +295,20 @@ impl Tokenizer {
                         detail: "added_tokens entry missing content".to_string(),
                     })?
                     .to_string();
+                if content.is_empty() {
+                    return Err(KatakuriError::InvalidTokenizerJson {
+                        detail: "added token content must be non-empty".to_string(),
+                    });
+                }
+                for flag_name in ["single_word", "lstrip", "rstrip"] {
+                    if entry.get(flag_name).and_then(Value::as_bool) == Some(true) {
+                        return Err(KatakuriError::InvalidTokenizerJson {
+                            detail: format!(
+                                "added token '{content}' sets unsupported flag '{flag_name}'"
+                            ),
+                        });
+                    }
+                }
                 let id = entry
                     .get("id")
                     .and_then(Value::as_u64)
@@ -334,6 +348,15 @@ impl Tokenizer {
                         strategy: strategy.to_string(),
                     });
                 }
+                let direction = t
+                    .get("direction")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Right");
+                if direction != "Right" {
+                    return Err(KatakuriError::UnsupportedTruncationDirection {
+                        direction: direction.to_string(),
+                    });
+                }
                 let max_length = t.get("max_length").and_then(Value::as_u64).ok_or_else(|| {
                     KatakuriError::InvalidTokenizerJson {
                         detail: "truncation missing u64 max_length".to_string(),
@@ -342,6 +365,46 @@ impl Tokenizer {
                 Some(usize::try_from(max_length).unwrap_or(usize::MAX))
             }
         };
+
+        let cls_label = cls_token.clone();
+        let sep_label = sep_token.clone();
+
+        // post_processor.special_tokens (when present) defines the
+        // template expansion; validate it agrees with the vocab — a
+        // divergent mapping would silently change ids (review round 1).
+        if let Some(map) = pp.get("special_tokens").and_then(Value::as_object) {
+            for label in [&cls_label, &sep_label] {
+                let entry =
+                    map.get(label.as_str())
+                        .ok_or_else(|| KatakuriError::InvalidTokenizerJson {
+                            detail: format!("special_tokens missing mapping for '{label}'"),
+                        })?;
+                let ids = entry.get("ids").and_then(Value::as_array);
+                let tokens = entry.get("tokens").and_then(Value::as_array);
+                match (ids, tokens) {
+                    (Some(ids), Some(tokens)) if ids.len() == 1 && tokens.len() == 1 => {
+                        let id = ids[0].as_u64().unwrap_or(u64::MAX);
+                        let tok = tokens[0].as_str().unwrap_or("");
+                        let vocab_id =
+                            u64::from(vocab.get(label.as_str()).copied().unwrap_or(u32::MAX));
+                        if id != vocab_id || tok != label.as_str() {
+                            return Err(KatakuriError::InvalidTokenizerJson {
+                                detail: format!(
+                                    "special_tokens mapping for '{label}' diverges from the vocab"
+                                ),
+                            });
+                        }
+                    }
+                    _ => {
+                        return Err(KatakuriError::InvalidTokenizerJson {
+                            detail: format!(
+                                "special_tokens mapping for '{label}' must be a singleton expansion"
+                            ),
+                        });
+                    }
+                }
+            }
+        }
 
         // resolve special ids from the vocab
         let special_id = |token: &str| -> Result<u32, KatakuriError> {
@@ -488,6 +551,9 @@ impl Tokenizer {
         while i < text.len() {
             let mut hit: Option<(usize, u32)> = None;
             for t in &self.added_tokens {
+                if t.content.is_empty() {
+                    continue;
+                }
                 if text[i..].starts_with(t.content.as_str()) {
                     hit = Some((t.content.len(), t.id));
                     break;
@@ -550,9 +616,11 @@ impl Tokenizer {
         } else {
             spaced
         };
-        // 4. lowercase
+        // 4. lowercase — per character: the reference maps each char
+        // independently; str::to_lowercase would apply contextual final
+        // sigma and diverge from HF on e.g. "ΟΣ" (review round 1).
         if self.norm.lowercase {
-            stripped.to_lowercase()
+            stripped.chars().flat_map(char::to_lowercase).collect()
         } else {
             stripped
         }
@@ -985,5 +1053,80 @@ mod tests {
             Tokenizer::from_bert_vocab_txt(b""),
             Err(KatakuriError::EmptyVocab)
         ));
+    }
+
+    #[test]
+    fn lowercase_per_char_no_final_sigma() {
+        let tk = tiny(&[]);
+        // Per-char: Σ → σ always. str::to_lowercase would give "ος" here.
+        assert_eq!(tk.normalize("ΟΣ"), "οσ");
+        assert_eq!(tk.normalize("ΟΣΟ"), "οσο");
+    }
+
+    #[test]
+    fn empty_and_flagged_added_tokens_reject() {
+        let mut v = tiny_json();
+        v["model"]["vocab"][""] = json!(9);
+        v["added_tokens"].as_array_mut().unwrap().push(
+            json!({"id": 9, "content": "", "single_word": false,
+                "lstrip": false, "rstrip": false, "normalized": false,
+                "special": false}),
+        );
+        assert!(matches!(
+            from_json(&v),
+            Err(KatakuriError::InvalidTokenizerJson { .. })
+        ));
+
+        let mut v = tiny_json();
+        v["added_tokens"][3]["single_word"] = json!(true);
+        assert!(matches!(
+            from_json(&v),
+            Err(KatakuriError::InvalidTokenizerJson { .. })
+        ));
+    }
+
+    #[test]
+    fn truncation_direction_left_rejects() {
+        let mut v = tiny_json();
+        v["truncation"] = json!({
+            "direction": "Left", "max_length": 8,
+            "strategy": "LongestFirst", "stride": 0
+        });
+        assert!(matches!(
+            from_json(&v),
+            Err(KatakuriError::UnsupportedTruncationDirection { direction })
+                if direction == "Left"
+        ));
+    }
+
+    #[test]
+    fn template_special_tokens_mapping_validated() {
+        // Divergent id (CLS mapped to [SEP]'s id) → reject.
+        let mut v = tiny_json();
+        v["post_processor"]["special_tokens"] = json!({
+            "[CLS]": {"ids": [3], "tokens": ["[CLS]"]},
+            "[SEP]": {"ids": [3], "tokens": ["[SEP]"]}
+        });
+        assert!(matches!(
+            from_json(&v),
+            Err(KatakuriError::InvalidTokenizerJson { .. })
+        ));
+        // Non-singleton expansion → reject.
+        let mut v = tiny_json();
+        v["post_processor"]["special_tokens"] = json!({
+            "[CLS]": {"ids": [2, 3], "tokens": ["[CLS]"]},
+            "[SEP]": {"ids": [3], "tokens": ["[SEP]"]}
+        });
+        assert!(matches!(
+            from_json(&v),
+            Err(KatakuriError::InvalidTokenizerJson { .. })
+        ));
+        // Agreeing mapping → accepted (both specials resolve as before).
+        let mut v = tiny_json();
+        v["post_processor"]["special_tokens"] = json!({
+            "[CLS]": {"ids": [2], "tokens": ["[CLS]"]},
+            "[SEP]": {"ids": [3], "tokens": ["[SEP]"]}
+        });
+        assert!(from_json(&v).is_ok());
     }
 }

@@ -164,6 +164,14 @@ pub enum KatakuriError {
         strategy: String,
     },
 
+    /// A `tokenizer.json` enables truncation with a direction other than
+    /// `Right` (left truncation is not implemented).
+    #[error("unsupported truncation direction '{direction}' (only Right)")]
+    UnsupportedTruncationDirection {
+        /// The rejected direction string.
+        direction: String,
+    },
+
     /// A `tokenizer.json` is malformed: a required field is missing or has
     /// the wrong shape (model vocab, added-token entries, truncation
     /// parameters, added-token id/content mismatch against the vocab).

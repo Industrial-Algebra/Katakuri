@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependencies: `unicode-normalization 0.1` (NFD) and
   `unicode_categories 0.1` (is_other/is_mark_nonspacing/is_punctuation)
   — the reference implementation's own Unicode tables.
+- Strict-construction hardening (review round 1): per-character
+  lowercase (no contextual final sigma — parity with the reference);
+  empty added tokens, boundary-flag added tokens (single_word/lstrip/
+  rstrip), left-truncation direction, and divergent template
+  special_tokens mappings all reject with typed errors; golden reader
+  uses checked u32 conversion.
 
 ### Added — S1: safetensors parse/validate (2026-10-16)
 
