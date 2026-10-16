@@ -125,6 +125,74 @@ pub enum KatakuriError {
         name: String,
     },
 
+    /// A `tokenizer.json` carries a normalizer kind Katakuri does not
+    /// implement (only `BertNormalizer` is supported).
+    #[error("unsupported normalizer kind '{kind}' (only BertNormalizer)")]
+    UnsupportedNormalizer {
+        /// The rejected kind string.
+        kind: String,
+    },
+
+    /// A `tokenizer.json` carries a pre-tokenizer kind Katakuri does not
+    /// implement (only `BertPreTokenizer` is supported).
+    #[error("unsupported pre-tokenizer kind '{kind}' (only BertPreTokenizer)")]
+    UnsupportedPreTokenizer {
+        /// The rejected kind string.
+        kind: String,
+    },
+
+    /// A `tokenizer.json` carries a post-processor Katakuri does not
+    /// implement, or a template shape other than `[CLS] A [SEP]`.
+    #[error("unsupported post-processor: {kind}")]
+    UnsupportedPostProcessor {
+        /// The rejected kind or shape description.
+        kind: String,
+    },
+
+    /// A `tokenizer.json` carries a model kind other than WordPiece.
+    #[error("unsupported model kind '{kind}' (only WordPiece)")]
+    UnsupportedModel {
+        /// The rejected kind string.
+        kind: String,
+    },
+
+    /// A `tokenizer.json` enables truncation with a strategy other than
+    /// `LongestFirst` (the single-sequence BERT default).
+    #[error("unsupported truncation strategy '{strategy}' (only LongestFirst)")]
+    UnsupportedTruncationStrategy {
+        /// The rejected strategy string.
+        strategy: String,
+    },
+
+    /// A `tokenizer.json` enables truncation with a direction other than
+    /// `Right` (left truncation is not implemented).
+    #[error("unsupported truncation direction '{direction}' (only Right)")]
+    UnsupportedTruncationDirection {
+        /// The rejected direction string.
+        direction: String,
+    },
+
+    /// A `tokenizer.json` is malformed: a required field is missing or has
+    /// the wrong shape (model vocab, added-token entries, truncation
+    /// parameters, added-token id/content mismatch against the vocab).
+    #[error("tokenizer.json invalid: {detail}")]
+    InvalidTokenizerJson {
+        /// What was wrong.
+        detail: String,
+    },
+
+    /// A vocab source contained no tokens at all.
+    #[error("vocab is empty")]
+    EmptyVocab,
+
+    /// A BERT-class special token (`[CLS]`, `[SEP]`, `[UNK]`, `[PAD]`) is
+    /// absent from the vocab.
+    #[error("vocab is missing the special token '{token}'")]
+    MissingSpecialToken {
+        /// The missing special token text.
+        token: String,
+    },
+
     /// A Zunesha device operation failed (includes `NoDevice` — the typed
     /// signal that no GPU backend is available and weights stay host-side).
     #[error("device error: {0}")]
