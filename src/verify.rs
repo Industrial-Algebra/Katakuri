@@ -7,9 +7,9 @@
 //! Borsalino bundles GPU-kernel safety obligations; Katakuri bundles
 //! **parse invariants** — the properties `SafeTensors::parse` enforces
 //! before any tensor becomes reachable. Every property is tier
-//! [`VerificationTier::Impossible`]: the validator makes the illegal state
-//! unrepresentable (a manifest that parses is a manifest that satisfies
-//! them).
+//! [`Impossible`](karpal_verify::VerificationTier::Impossible): the
+//! validator makes the illegal state unrepresentable (a manifest that
+//! parses is a manifest that satisfies them).
 //!
 //! Bundles export to the karpal SMT/Lean/Kani backends.
 //!
@@ -17,9 +17,9 @@
 //!
 //! | Property | What it prevents | Enforced by |
 //! |---|---|---|
-//! | [`IsOffsetInBounds`] | offsets escaping the data region | `OffsetOutOfBounds` rejection |
-//! | [`IsSpanConsistent`] | span ≠ shape×dtype bytes | `SizeMismatch` / `SizeOverflow` rejection |
-//! | [`IsManifestNonOverlapping`] | two tensors claiming the same bytes | `OverlappingTensors` rejection |
+//! | [`IsOffsetInBounds`](crate::verify::IsOffsetInBounds) | offsets escaping the data region | `OffsetOutOfBounds` rejection |
+//! | [`IsSpanConsistent`](crate::verify::IsSpanConsistent) | span ≠ shape×dtype bytes | `SizeMismatch` / `SizeOverflow` rejection |
+//! | [`IsManifestNonOverlapping`](crate::verify::IsManifestNonOverlapping) | two tensors claiming the same bytes | `OverlappingTensors` rejection |
 
 use karpal_proof::Property;
 use karpal_verify::{Obligation, ObligationBundle, Origin, Sort, Term, VerificationTier};
