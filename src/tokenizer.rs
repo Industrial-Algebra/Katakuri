@@ -369,40 +369,69 @@ impl Tokenizer {
         let cls_label = cls_token.clone();
         let sep_label = sep_token.clone();
 
-        // post_processor.special_tokens (when present) defines the
-        // template expansion; validate it agrees with the vocab — a
-        // divergent mapping would silently change ids (review round 1).
-        if let Some(map) = pp.get("special_tokens").and_then(Value::as_object) {
-            for label in [&cls_label, &sep_label] {
-                let entry =
-                    map.get(label.as_str())
-                        .ok_or_else(|| KatakuriError::InvalidTokenizerJson {
-                            detail: format!("special_tokens missing mapping for '{label}'"),
-                        })?;
-                let ids = entry.get("ids").and_then(Value::as_array);
-                let tokens = entry.get("tokens").and_then(Value::as_array);
-                match (ids, tokens) {
-                    (Some(ids), Some(tokens)) if ids.len() == 1 && tokens.len() == 1 => {
+        // post_processor.special_tokens, when PRESENT, must be an object —
+        // HF rejects malformed maps at deserialization; absence alone is
+        // the documented fallback (review rounds 1–2).
+        match pp.get("special_tokens") {
+            None => {}
+            Some(Value::Object(map)) => {
+                // Every entry must be structurally valid: object with
+                // non-empty, equal-length ids (u64) / tokens (strings).
+                for (key, entry) in map {
+                    let (ids, tokens) = match (
+                        entry.get("ids").and_then(Value::as_array),
+                        entry.get("tokens").and_then(Value::as_array),
+                    ) {
+                        (Some(ids), Some(tokens))
+                            if !ids.is_empty()
+                                && ids.len() == tokens.len()
+                                && ids.iter().all(|i| i.as_u64().is_some())
+                                && tokens.iter().all(|t| t.as_str().is_some()) =>
+                        {
+                            (ids, tokens)
+                        }
+                        _ => {
+                            return Err(KatakuriError::InvalidTokenizerJson {
+                                detail: format!("special_tokens entry '{key}' is malformed"),
+                            });
+                        }
+                    };
+                    // Template labels additionally: singleton expansions
+                    // agreeing with the vocab (review round 1).
+                    if key == &cls_label || key == &sep_label {
+                        if ids.len() != 1 {
+                            return Err(KatakuriError::InvalidTokenizerJson {
+                                detail: format!(
+                                    "special_tokens mapping for '{key}' must be a singleton expansion"
+                                ),
+                            });
+                        }
                         let id = ids[0].as_u64().unwrap_or(u64::MAX);
                         let tok = tokens[0].as_str().unwrap_or("");
                         let vocab_id =
-                            u64::from(vocab.get(label.as_str()).copied().unwrap_or(u32::MAX));
-                        if id != vocab_id || tok != label.as_str() {
+                            u64::from(vocab.get(key.as_str()).copied().unwrap_or(u32::MAX));
+                        if id != vocab_id || tok != key.as_str() {
                             return Err(KatakuriError::InvalidTokenizerJson {
                                 detail: format!(
-                                    "special_tokens mapping for '{label}' diverges from the vocab"
+                                    "special_tokens mapping for '{key}' diverges from the vocab"
                                 ),
                             });
                         }
                     }
-                    _ => {
+                }
+                // Both template labels must be mapped when the map is present.
+                for label in [&cls_label, &sep_label] {
+                    if !map.contains_key(label.as_str()) {
                         return Err(KatakuriError::InvalidTokenizerJson {
-                            detail: format!(
-                                "special_tokens mapping for '{label}' must be a singleton expansion"
-                            ),
+                            detail: format!("special_tokens missing mapping for '{label}'"),
                         });
                     }
                 }
+            }
+            Some(other) => {
+                return Err(KatakuriError::InvalidTokenizerJson {
+                    detail: format!("post_processor.special_tokens must be an object, got {other}"),
+                });
             }
         }
 
@@ -1127,6 +1156,50 @@ mod tests {
             "[CLS]": {"ids": [2], "tokens": ["[CLS]"]},
             "[SEP]": {"ids": [3], "tokens": ["[SEP]"]}
         });
+        assert!(from_json(&v).is_ok());
+    }
+
+    #[test]
+    fn malformed_special_tokens_maps_reject() {
+        // Present-but-not-an-object: HF rejects these bytes at
+        // deserialization; absence alone is the fallback (review r2).
+        for bad in [json!([]), json!(null), json!("bad")] {
+            let mut v = tiny_json();
+            v["post_processor"]["special_tokens"] = bad.clone();
+            assert!(
+                matches!(
+                    from_json(&v),
+                    Err(KatakuriError::InvalidTokenizerJson { .. })
+                ),
+                "special_tokens {bad} should reject"
+            );
+        }
+        // Structurally-garbage extra entry rejects too.
+        let mut v = tiny_json();
+        v["post_processor"]["special_tokens"] = json!({
+            "[CLS]": {"ids": [2], "tokens": ["[CLS]"]},
+            "[SEP]": {"ids": [3], "tokens": ["[SEP]"]},
+            "[MASK]": 3
+        });
+        assert!(matches!(
+            from_json(&v),
+            Err(KatakuriError::InvalidTokenizerJson { .. })
+        ));
+        // Structurally-valid extra entry accepts (non-template entries
+        // are not vocab-checked).
+        let mut v = tiny_json();
+        v["post_processor"]["special_tokens"] = json!({
+            "[CLS]": {"ids": [2], "tokens": ["[CLS]"]},
+            "[SEP]": {"ids": [3], "tokens": ["[SEP]"]},
+            "[MASK]": {"ids": [9], "tokens": ["[MASK]"]}
+        });
+        assert!(from_json(&v).is_ok());
+        // Genuinely absent map still falls back (committed-fixture shape).
+        let mut v = tiny_json();
+        v["post_processor"]
+            .as_object_mut()
+            .unwrap()
+            .remove("special_tokens");
         assert!(from_json(&v).is_ok());
     }
 }
