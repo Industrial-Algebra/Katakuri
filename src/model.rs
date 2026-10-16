@@ -138,6 +138,17 @@ impl BertSpec {
         let hidden_size = size_field(obj, "hidden_size")?;
         let num_attention_heads = size_field(obj, "num_attention_heads")?;
         let num_hidden_layers = size_field(obj, "num_hidden_layers")?;
+        // Bounded: `expected_tensors()` derives `5 + 16·L + 2` entries,
+        // which overflows 32-bit `usize` near `u32::MAX` — a parse-valid
+        // spec must never trap in a later method (review round 3). The
+        // largest known BERT-family encoders use ≤ 96 layers; 1024 is
+        // >10× headroom.
+        if num_hidden_layers > 1024 {
+            return Err(invalid_config(format!(
+                "num_hidden_layers {num_hidden_layers} exceeds the supported \
+                 maximum of 1024"
+            )));
+        }
         let intermediate_size = size_field(obj, "intermediate_size")?;
         let vocab_size = size_field(obj, "vocab_size")?;
         let type_vocab_size = size_field(obj, "type_vocab_size")?;
@@ -871,6 +882,21 @@ mod tests {
             tiny().check_tokenizer_compatibility(&tk),
             Err(KatakuriError::InvalidConfigJson { .. })
         ));
+    }
+
+    #[test]
+    fn layer_count_bounded_at_parse_time() {
+        // `5 + 16·L + 2` overflows 32-bit usize near `u32::MAX` —
+        // a parse-valid spec must never trap in `expected_tensors()`
+        // (review round 3). Boundary: 1024 parses, 1025 rejects.
+        let mut huge = tiny_json();
+        huge["num_hidden_layers"] = json!(1025);
+        assert!(rejects(&huge));
+
+        let mut max = tiny_json();
+        max["num_hidden_layers"] = json!(1024);
+        let spec = parse_config(&max).expect("1024 layers parses");
+        assert_eq!(spec.expected_tensors().len(), 5 + 16 * 1024 + 2);
     }
 }
 
