@@ -516,6 +516,25 @@ impl Tokenizer {
         self.vocab.len()
     }
 
+    /// The largest token id this tokenizer can emit: the max over the
+    /// vocab table, added-token ids, and the fixed special ids.
+    ///
+    /// Embedding-table capacity checks use this — a tokenizer whose
+    /// ids fit `max_token_id() + 1 <= vocab_size` rows can never
+    /// index out of bounds (review round 1, S3: cardinality alone
+    /// misses sparse ids).
+    #[must_use]
+    pub fn max_token_id(&self) -> u32 {
+        let specials = [self.unk_id, self.cls_id, self.sep_id, self.pad_id];
+        self.vocab
+            .values()
+            .copied()
+            .chain(self.added_tokens.iter().map(|t| t.id))
+            .chain(specials)
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Encode one sequence. Never pads; unknown pieces are `[UNK]`.
     #[must_use]
     pub fn encode(&self, text: &str, add_special_tokens: bool) -> Encoding {
@@ -1214,5 +1233,23 @@ mod tests {
             .unwrap()
             .remove("special_tokens");
         assert!(from_json(&v).is_ok());
+    }
+
+    #[test]
+    fn max_token_id_covers_vocab_added_and_specials() {
+        let tk = from_json(&tiny_json()).expect("tiny tokenizer parses");
+        assert_eq!(tk.vocab_size(), 9);
+        assert_eq!(tk.max_token_id(), 8); // vocab max; specials are 0..=3
+
+        // Added token past the vocab max dominates.
+        let mut v = tiny_json();
+        v["added_tokens"].as_array_mut().unwrap().push(json!({
+            "id": 77, "content": "<extra>", "single_word": false,
+            "lstrip": false, "rstrip": false, "normalized": false,
+            "special": false
+        }));
+        v["model"]["vocab"]["<extra>"] = json!(77);
+        let tk = from_json(&v).expect("tiny tokenizer with added token parses");
+        assert_eq!(tk.max_token_id(), 77);
     }
 }

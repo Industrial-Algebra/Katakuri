@@ -270,22 +270,28 @@ impl BertSpec {
         }
     }
 
-    /// Cross-checks the spec against a tokenizer: the tokenizer's
-    /// vocabulary size must equal the config's `vocab_size`.
+    /// Cross-checks the spec against a tokenizer: no token id the
+    /// tokenizer can emit may index past the embedding table —
+    /// `max_token_id() + 1 <= vocab_size`. Cardinality alone is not
+    /// the check: sparse vocab ids (entry id 40000 in a 30522-entry
+    /// table) preserve cardinality but overflow the table
+    /// (review round 1). A tokenizer smaller than the table is legal
+    /// (vocab-padded configs leave rows unused).
     ///
     /// # Errors
     ///
-    /// [`crate::error::KatakuriError::InvalidConfigJson`] on mismatch
-    /// (detail carries both numbers).
+    /// [`crate::error::KatakuriError::InvalidConfigJson`] when the
+    /// tokenizer can emit an id at or past `vocab_size` (detail
+    /// carries the max emittable id and the table size).
     pub fn check_tokenizer_compatibility(
         &self,
         tokenizer: &crate::tokenizer::Tokenizer,
     ) -> Result<(), KatakuriError> {
-        let tokenizer_vocab = tokenizer.vocab_size();
-        if tokenizer_vocab != self.vocab_size {
+        let max_id = tokenizer.max_token_id();
+        if max_id as usize + 1 > self.vocab_size {
             return Err(invalid_config(format!(
-                "tokenizer vocabulary size {tokenizer_vocab} does not match config \
-                 vocab_size {}",
+                "tokenizer can emit id {max_id}, past the embedding table \
+                 (vocab_size {})",
                 self.vocab_size
             )));
         }
@@ -745,6 +751,55 @@ mod tests {
         }
     }
 
+    /// A valid BERT-class `tokenizer.json` with a tiny 9-entry vocab
+    /// (ids 0..=8), for the tokenizer-compatibility tests. The vocab
+    /// object lives at `["model"]["vocab"]`; mutate it per test.
+    fn small_tokenizer_json() -> Value {
+        let vocab = [
+            "[PAD]", "[UNK]", "[CLS]", "[SEP]", "un", "##aff", "##able", "aff", "hello",
+        ];
+        let mut vocab_obj = Map::new();
+        for (i, t) in vocab.iter().enumerate() {
+            vocab_obj.insert((*t).to_string(), Value::from(i as u32));
+        }
+        let special = |content: &str, id: u32| {
+            json!({"id": id, "content": content, "single_word": false,
+                   "lstrip": false, "rstrip": false, "normalized": false,
+                   "special": true})
+        };
+        json!({
+            "version": "1.0",
+            "truncation": null,
+            "padding": null,
+            "added_tokens": [
+                special("[PAD]", 0), special("[UNK]", 1),
+                special("[CLS]", 2), special("[SEP]", 3),
+            ],
+            "normalizer": {"type": "BertNormalizer", "clean_text": true,
+                "handle_chinese_chars": true, "strip_accents": null,
+                "lowercase": true},
+            "pre_tokenizer": {"type": "BertPreTokenizer"},
+            "post_processor": {"type": "TemplateProcessing",
+                "single": [
+                    {"SpecialToken": {"id": "[CLS]", "type_id": 0}},
+                    {"Sequence": {"id": "A", "type_id": 0}},
+                    {"SpecialToken": {"id": "[SEP]", "type_id": 0}},
+                ],
+                "pair": [
+                    {"SpecialToken": {"id": "[CLS]", "type_id": 0}},
+                    {"Sequence": {"id": "A", "type_id": 0}},
+                    {"SpecialToken": {"id": "[SEP]", "type_id": 0}},
+                    {"Sequence": {"id": "B", "type_id": 1}},
+                    {"SpecialToken": {"id": "[SEP]", "type_id": 1}},
+                ]},
+            "decoder": {"type": "WordPiece", "prefix": "##", "cleanup": true},
+            "model": {"type": "WordPiece", "unk_token": "[UNK]",
+                "continuing_subword_prefix": "##",
+                "max_input_chars_per_word": 100,
+                "vocab": vocab_obj},
+        })
+    }
+
     #[test]
     fn tokenizer_compatibility() {
         let minilm =
@@ -754,14 +809,46 @@ mod tests {
             Tokenizer::from_bert_vocab_txt(include_bytes!("../tests/fixtures/minilm-vocab.txt"))
                 .expect("MiniLM vocab parses");
         assert_eq!(tk.vocab_size(), 30522);
+        assert_eq!(tk.max_token_id(), 30521);
         minilm
             .check_tokenizer_compatibility(&tk)
-            .expect("matching vocab sizes");
+            .expect("ids fit the table");
 
+        // Tiny table: the MiniLM tokenizer overflows it.
         match tiny().check_tokenizer_compatibility(&tk) {
             Err(KatakuriError::InvalidConfigJson { detail }) => {
+                assert!(detail.contains("30521"), "{detail}");
                 assert!(detail.contains("32"), "{detail}");
-                assert!(detail.contains("30522"), "{detail}");
+            }
+            other => panic!("expected InvalidConfigJson, got {other:?}"),
+        }
+
+        // Smaller-than-table tokenizer is legal (vocab-padded rows).
+        let mut small_json = small_tokenizer_json();
+        small_json["model"]["vocab"] = json!({
+            "[PAD]": 0, "[UNK]": 1, "[CLS]": 2, "[SEP]": 3,
+            "un": 4, "##aff": 5, "##able": 6, "aff": 7, "hello": 8
+        });
+        let small = Tokenizer::from_tokenizer_json(small_json.to_string().as_bytes())
+            .expect("small tokenizer parses");
+        tiny()
+            .check_tokenizer_compatibility(&small)
+            .expect("ids fit the table");
+    }
+
+    #[test]
+    fn sparse_tokenizer_id_rejects() {
+        // Cardinality preserved (9 entries), one id moved past the
+        // table: capacity, not count, is the compatibility invariant
+        // (review round 1).
+        let mut sparse = small_tokenizer_json();
+        sparse["model"]["vocab"]["hello"] = json!(40);
+        let tk = Tokenizer::from_tokenizer_json(sparse.to_string().as_bytes())
+            .expect("sparse tokenizer parses");
+        match tiny().check_tokenizer_compatibility(&tk) {
+            Err(KatakuriError::InvalidConfigJson { detail }) => {
+                assert!(detail.contains("40"), "{detail}");
+                assert!(detail.contains("32"), "{detail}");
             }
             other => panic!("expected InvalidConfigJson, got {other:?}"),
         }
