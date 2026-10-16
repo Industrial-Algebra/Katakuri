@@ -454,6 +454,10 @@ fn validate_no_overlap(tensors: &BTreeMap<String, TensorMeta>) -> Result<(), Kat
     let mut spans: Vec<(&str, usize, usize)> = tensors
         .iter()
         .map(|(n, m)| (n.as_str(), m.data_offsets.0, m.data_offsets.1))
+        // Empty spans claim zero bytes — they cannot conflict with any
+        // other span (review round 1: zero-length tensors inside another
+        // tensor's span were falsely rejected as overlapping).
+        .filter(|&(_, start, end)| start < end)
         .collect();
     spans.sort_unstable_by_key(|&(_, start, _)| start);
     for pair in spans.windows(2) {
@@ -651,7 +655,7 @@ mod tests {
         let bytes = build_file(&header, &[0u8; 8]);
         match SafeTensors::parse(&bytes) {
             Err(KatakuriError::InvalidTensorInfo { reason, .. }) => {
-                assert!(reason.contains('\''), "reason names the field: {reason}");
+                assert!(reason.contains("foo"), "reason names the field: {reason}");
             }
             other => panic!("expected InvalidTensorInfo, got {other:?}"),
         }
@@ -762,6 +766,22 @@ mod tests {
                 offset: 4
             }) if first == "a" && second == "b"
         ));
+    }
+
+    #[test]
+    fn parse_allows_empty_tensors_within_other_spans() {
+        // Review round 1: empty spans claim zero bytes and must not reject.
+        for z_offsets in [[0, 0], [4, 4]] {
+            let header = json!({
+                "a": {"dtype": "U8", "shape": [8], "data_offsets": [0, 8]},
+                "z": {"dtype": "U8", "shape": [0], "data_offsets": z_offsets}
+            });
+            let bytes = build_file(&header, &[0u8; 8]);
+            let st = SafeTensors::parse(&bytes).expect("empty spans cannot overlap");
+            assert_eq!(st.tensor_count(), 2);
+            assert_eq!(st.tensor("a").unwrap().bytes().len(), 8);
+            assert_eq!(st.tensor("z").unwrap().bytes(), &[] as &[u8]);
+        }
     }
 
     // ── Acceptance ───────────────────────────────────────────────
