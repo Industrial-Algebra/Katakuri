@@ -38,9 +38,9 @@
 //! - [`tokenizer`] — WordPiece (BERT-class) tokenization matching Ijima's
 //!   exact tokenization contract, with golden-vector parity against HF
 //!   tokenizers 0.21.x (S2). Replaces the `tokenizers` crate dependency.
-//! - [`model`] — architecture specs as typed data: BERT config (layers /
-//!   heads / dims / hidden act), named-tensor layout manifests. Replaces
-//!   candle-transformers `models::bert`. Lands with S3.
+//! - [`model`] — typed BERT config + weight-layout manifests, validated
+//!   against parsed safetensors; the Ijima swap boundary (S3). Replaces
+//!   candle-transformers `models::bert`.
 //! - [`hub`] — model fetch + content-addressed cache over plain HTTPS,
 //!   offline-first. Replaces `hf-hub`. Optional feature; lands with S4.
 //!
