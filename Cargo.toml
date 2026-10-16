@@ -1,6 +1,27 @@
 [package]
-name = "Katakuri"
+name = "katakuri"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "Model ecosystem layer over Zunesha — safetensors weight loading, WordPiece tokenization, architecture specs, and hub access. Never computes."
+license = "Apache-2.0"
+repository = "https://github.com/Industrial-Algebra/Katakuri"
+keywords = ["safetensors", "tokenization", "wordpiece", "model-weights", "bert"]
+categories = ["science", "parser-implementations"]
+readme = "README.md"
+
+[features]
+default = ["std"]
+std = []
 
 [dependencies]
+thiserror = "2"
+
+# NOTE: Katakuri never computes — no forward passes, no autodiff, no optimizers,
+# no kernels, no shader compilation. That boundary is the architectural contract
+# (docs/plans/2026-10-16-katakuri-architecture-handover.md §4.1): consumers
+# implement forward passes over their tensor engine of choice; Katakuri loads,
+# validates, and describes the data they compute over.
+#
+# Zunesha becomes a dependency with slice S1 (safetensors → zunesha::Buffer and
+# the NoDevice host path). Nothing else is planned before 0.1.0.

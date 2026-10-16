@@ -1,0 +1,9 @@
+# Rust toolchain configuration for Katakuri
+#
+# Following Industrial Algebra ecosystem conventions (see Schubert, Baedeker):
+# a pinned channel with rustfmt + clippy components. Katakuri needs no
+# nightly features, so stable is pinned for reproducible builds.
+
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
