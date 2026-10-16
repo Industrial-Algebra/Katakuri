@@ -288,7 +288,11 @@ impl BertSpec {
         tokenizer: &crate::tokenizer::Tokenizer,
     ) -> Result<(), KatakuriError> {
         let max_id = tokenizer.max_token_id();
-        if max_id as usize + 1 > self.vocab_size {
+        // `>=`, not `+ 1 >`: on 32-bit targets (wasm32) `max_id as usize
+        // + 1` wraps at `u32::MAX` and admits the overflow case
+        // (review round 2). `max_id >= vocab_size` is target-independent
+        // and algebraically identical on 64-bit.
+        if max_id as usize >= self.vocab_size {
             return Err(invalid_config(format!(
                 "tokenizer can emit id {max_id}, past the embedding table \
                  (vocab_size {})",
@@ -852,6 +856,21 @@ mod tests {
             }
             other => panic!("expected InvalidConfigJson, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn u32_max_token_id_rejects_without_overflow() {
+        // `u32::MAX` is the wrap point that made `+ 1` unsound on
+        // 32-bit targets (review round 2); the `>=` form rejects it
+        // on every target.
+        let mut extreme = small_tokenizer_json();
+        extreme["model"]["vocab"]["hello"] = json!(u32::MAX);
+        let tk = Tokenizer::from_tokenizer_json(extreme.to_string().as_bytes())
+            .expect("extreme tokenizer parses");
+        assert!(matches!(
+            tiny().check_tokenizer_compatibility(&tk),
+            Err(KatakuriError::InvalidConfigJson { .. })
+        ));
     }
 }
 
