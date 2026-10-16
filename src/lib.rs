@@ -33,8 +33,8 @@
 //! ## Modules
 //!
 //! - [`safetensors`] — weight parse + validate (dtype / shape / layout /
-//!   manifest) into a `zunesha::Buffer` or host memory. Replaces candle's
-//!   `VarBuilder` and safetensors glue. Lands with slice S1.
+//!   manifest) into borrowed host memory or an uploaded `zunesha::Buffer`.
+//!   Replaces candle's `VarBuilder` and safetensors glue. Slice S1.
 //! - [`tokenizer`] — WordPiece (BERT-class) tokenization matching Ijima's
 //!   exact tokenization contract, with golden-vector parity against HF
 //!   tokenizers. Replaces the `tokenizers` crate dependency. Lands with S2.
@@ -47,14 +47,28 @@
 //! ## Features
 //!
 //! - `std` (default): standard-library support
+//! - `verify`: karpal-verify obligation bundles for the parse invariants
+//!   (the Borsalino verification pattern, adapted to a parser crate)
+//!
+//! ## Kani harnesses
+//!
+//! `src/kani_harnesses.rs` carries `#[cfg(kani)]` proof harnesses for the
+//! validation arithmetic (offset containment, span consistency, overflow
+//! rejection). Inert in normal builds; run with
+//! `cargo kani --harness <name>`.
 //!
 //! ## Usage
 //!
 //! ```rust
-//! // The public surface lands with slices S1–S4 (safetensors, tokenizer,
-//! // model specs, hub); this example grows with them. For now it pins the
-//! // one public type the scaffold exports: the central error type.
-//! fn _accepts_katakuri_errors(_: Result<(), katakuri::KatakuriError>) {}
+//! use katakuri::safetensors::SafeTensors;
+//!
+//! # fn main() -> Result<(), katakuri::KatakuriError> {
+//! // An empty safetensors file: 8-byte LE header length of 2, then "{}".
+//! let bytes: &[u8] = &[2, 0, 0, 0, 0, 0, 0, 0, b'{', b'}'];
+//! let st = SafeTensors::parse(bytes)?;
+//! assert_eq!(st.tensor_count(), 0);
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Provenance
@@ -64,10 +78,20 @@
 //! slice plan live in
 //! `docs/plans/2026-10-16-katakuri-architecture-handover.md`.
 
+#![warn(missing_docs)]
+
 pub mod error;
 pub mod hub;
 pub mod model;
 pub mod safetensors;
 pub mod tokenizer;
+
+/// Karpal obligation bundles for the parse invariants (Borsalino pattern).
+#[cfg(feature = "verify")]
+pub mod verify;
+
+/// Kani proof harnesses — compiled only under `cargo kani`.
+#[cfg(kani)]
+pub mod kani_harnesses;
 
 pub use error::KatakuriError;

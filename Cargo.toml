@@ -13,15 +13,32 @@ readme = "README.md"
 [features]
 default = ["std"]
 std = []
+# Borsalino-pattern verification obligations (karpal stack).
+verify = ["dep:karpal-verify", "dep:karpal-proof"]
 
 [dependencies]
 thiserror = "2"
+# Header parsing: the safetensors header IS JSON; serde_json is the
+# ecosystem-standard, dependency-light parser (serde/itoa/ryu/memchr only).
+serde_json = "1"
+# The device substrate: Buffer upload + the NoDeviceStub host path.
+zunesha = "0.1.2"
+# Verification stack, feature-gated per the Borsalino pattern.
+karpal-verify = { version = "0.6.1", optional = true }
+karpal-proof = { version = "0.6.1", optional = true }
 
 # NOTE: Katakuri never computes — no forward passes, no autodiff, no optimizers,
 # no kernels, no shader compilation. That boundary is the architectural contract
-# (docs/plans/2026-10-16-katakuri-architecture-handover.md §4.1): consumers
-# implement forward passes over their tensor engine of choice; Katakuri loads,
-# validates, and describes the data they compute over.
+# (docs/plans/2026-10-16-katakuri-architecture-handover.md §4.1).
 #
-# Zunesha becomes a dependency with slice S1 (safetensors → zunesha::Buffer and
-# the NoDevice host path). Nothing else is planned before 0.1.0.
+# Dependency ledger (no silent growth — every entry justified in the PR):
+# - thiserror 2: central error enum (IA standard, same as Zunesha)
+# - serde_json 1: safetensors header parse (the format is JSON)
+# - zunesha 0.1.2: device upload + NoDevice host path (the substrate)
+# - karpal-verify/proof 0.6.1: verify-feature obligations (Borsalino pattern,
+#   pinned to Borsalino's own pin)
+
+# Declare the `kani` cfg so `#[cfg(kani)]` (lib.rs module gate) does not trip
+# rustc's `unexpected_cfgs` lint under `-D warnings`. Inert outside Kani.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
