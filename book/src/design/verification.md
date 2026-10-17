@@ -1,7 +1,7 @@
 # Verification
 
 Katakuri carries the Borsalino verification pattern in two independent forms:
-**obligation bundles** (machine-checked properties, feature `verify`) and
+**obligation bundles** — machine-readable invariant *specifications*, exported as SMT-LIB scripts (feature `verify`; no obligations are discharged by the crate itself — a solver must consume the exported scripts). The karpal-verify SMT exporter has an upstream operator-mapping defect (Karpal#176), pinned pending fix and
 **Kani harnesses** (bounded model checking of the validation arithmetic).
 
 ## Obligation bundles (`verify`)

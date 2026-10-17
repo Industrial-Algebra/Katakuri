@@ -1,7 +1,7 @@
 # Katakuri
 
 [![crates.io](https://img.shields.io/crates/v/katakuri.svg)](https://crates.io/crates/katakuri)
-[![docs](https://img.shields.io/badge/docs-katakuri.industrialalgebra.com-00cccc)](https://docs.katakuri.industrialalgebra.com)
+[![docs](https://img.shields.io/badge/docs-mdBook_sources-00cccc)](book/src/SUMMARY.md)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 Model ecosystem layer over [Zunesha](https://github.com/Industrial-Algebra/Zunesha) — safetensors weight loading, WordPiece tokenization, BERT architecture specs, and hub access.
@@ -65,7 +65,7 @@ The hub adds nothing to the default dependency tree: `Fetch` is a dependency-fre
 
 ## Documentation
 
-Book: <https://docs.katakuri.industrialalgebra.com> (mdBook sources in [`book/`](book/)) · API: <https://docs.rs/katakuri> · Contracts: [`docs/plans/`](docs/plans/) · [Roadmap](docs/ROADMAP.md) · [Critique](docs/critique.md) · [Changelog](CHANGELOG.md).
+Book: mdBook sources in [`book/`](book/) (hosting planned; not yet deployed) ·  · API: <https://docs.rs/katakuri> · Contracts: [`docs/plans/`](docs/plans/) · [Roadmap](docs/ROADMAP.md) · [Critique](docs/critique.md) · [Changelog](CHANGELOG.md).
 
 ## Development
 

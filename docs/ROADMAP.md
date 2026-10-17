@@ -5,7 +5,7 @@
 > contracted; items move up only when a consumer needs them and a written
 > contract exists (the `docs/plans/` pattern).
 
-## Shipped — v0.1.0
+## Implemented — v0.1.0 (publication pending)
 
 - **S1 · safetensors** — zero-copy parse + full validation (dtype, shape,
   offsets, span arithmetic, non-overlap, 100 MB header cap), `__metadata__`
@@ -39,7 +39,7 @@
   `x-repo-commit` header and verifying it stayed stable would close that gap
   (S4's recorded limitation).
 - **More architectures — BERT-class only for now.** `BertSpec` covers BERT
-  and its descendants (MiniLM, DistilBERT-shaped configs). Other families
+  and its descendants (MiniLM-class configs; the strict parser accepts `model_type: "bert"` only). Other families
   would each need their own spec type; nothing generic is planned, because
   "generic model spec" is how loaders grow compute.
 - **Minuet consumer measurement.** Minuet was identified as a consumer but its

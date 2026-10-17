@@ -39,7 +39,7 @@ network client at all. `sha2` arrives only with `hub`, and `ureq` only with
 - **`verify`** — three `ObligationBundle`s (`IsOffsetInBounds`,
   `IsSpanConsistent`, `IsManifestNonOverlapping`) exported for the karpal
   SMT/Lean/Kani backends, tier `Impossible`: the validator makes the illegal
-  state unrepresentable. See the book's [Verification](../book/src/design/verification.md) page.
+  state unrepresentable. See the book's [Verification](../../book/src/design/verification.md) page.
 - **`hub`** — `katakuri::hub`: `RepoId`, `Revision`, `Hub`, `Policy`, the
   `Fetch` trait, `sha256_hex`. Offline-first: with a warm cache, no network
   code path is reachable.
