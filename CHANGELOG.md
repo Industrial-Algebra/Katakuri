@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Nothing yet — the `0.1.0` items below ship together as the first release.
+
+## [0.1.0] — pending publish
+
+Undated on purpose: `cargo publish` and the `v0.1.0` tag make it real, and the
+operator's tag push finalizes it. Everything below landed between 2026-10-16
+and 2026-10-17 as slices S1–S4 plus release polish.
+
 ### Added — S4: hub (2026-10-17)
 
 - `hub`: optional fetch + content-addressed cache (offline-first,
@@ -16,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (case-insensitive filesystems), redacted Debug for bearer tokens,
   strict final-200 status check, HTTPS-only transport for token requests,
   feature-safe doc links.
+- Fixed (review round 2): the ureq agent is `https_only` across the whole
+  redirect chain, so an https→http downgrade cannot leak the bearer.
 
 ### Added — S3: model specs (2026-10-17)
 
@@ -26,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   capacity (max emittable id + 1 ≤ vocab_size) instead of cardinality —
   sparse vocab ids can no longer overflow the embedding table; vocab-padded
   (smaller-than-table) tokenizers are accepted as legal.
+- Fixed (review round 2): the capacity check uses `>=`, immune to 32-bit
+  (wasm32) wrap at `u32::MAX`.
+- Fixed (review round 3): `num_hidden_layers` bounded at 1024 at parse time —
+  `5 + 16·L + 2` overflowed 32-bit `usize` near `u32::MAX`.
 
 ### Added — S2: WordPiece tokenizer (2026-10-16)
 
@@ -54,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rstrip), left-truncation direction, and divergent template
   special_tokens mappings all reject with typed errors; golden reader
   uses checked u32 conversion.
+- Fixed (review round 2): present-but-malformed `special_tokens` maps
+  (`null`, non-object, wrong-shaped entries) reject instead of falling
+  through to defaults.
+- Fixed (review round 3): `special_tokens` ids are bounded to `u32`,
+  matching HF deserialization.
 
 ### Added — S1: safetensors parse/validate (2026-10-16)
 
@@ -74,6 +93,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MiniLM-shaped round-trip test (103-tensor BERT manifest, byte-exact),
   rejection tests for every validation rule, env-gated real-file
   round-trip (`KATAKURI_TEST_SAFETENSORS`).
+- Fixed (review round 1): zero-length spans are excluded from the
+  overlap check — empty tensors claim no bytes and can no longer be
+  falsely rejected inside another tensor's span.
+- Fixed (review round 2): `verify` module doc links resolve explicitly
+  under `RUSTDOCFLAGS="-D warnings"`.
 
 ### Added — repo scaffold (2026-10-16)
 
@@ -86,10 +110,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CLA reference, Forgejo mirror under `industrial-algebra` with dual-push
   wiring.
 
-### Dependencies (S1)
+### Added — release polish (2026-10-17)
+
+- CI gate matrix: test across feature combinations, clippy on default and
+  all-features, fmt, rustdoc with `-D warnings` per feature, example
+  compile + run, wasm32 build, publish on `v*` tags, book deploy.
+- mdBook (`book/`) with the IA theme: introduction, getting started,
+  concepts, feature flags, hub guide, per-module API pages, verification,
+  and the review record.
+- Three runnable examples: `inspect-safetensors`, `encode-text`,
+  `fetch-and-validate` (with `--offline`).
+- `docs/guide/feature-flags.md`, `docs/ROADMAP.md`, `docs/critique.md`, and
+  a rewritten README with status, quick start, and the IS / IS-NOT boundary.
+
+### Dependencies
 
 - `serde_json 1` — the safetensors header is JSON; the ecosystem-standard
   parser (serde/itoa/ryu/memchr transitives only).
 - `zunesha 0.1.2` — the device substrate (Buffer upload, NoDevice path).
 - `karpal-verify`/`karpal-proof 0.6.1` — verification obligations, behind
   the `verify` feature (pinned to Borsalino's pin).
+- `unicode-normalization 0.1`, `unicode_categories 0.1` — the tokenizer
+  reference implementation's own Unicode tables (S2).
+- `sha2 0.11` (feature `hub`) — sha256 for the content-addressed cache (S4).
+- `ureq 3.4` (feature `hub-net`) — blocking HTTPS with rustls, redirects,
+  no async runtime (S4).
+
+### Security
+
+- Hub cache poisoning is structurally blocked: content/digest/temp namespace
+  separation, sidecars named exactly the filename, digest verification on
+  every read, case-safe path encoding, and a strict path grammar that rejects
+  `..`/`/`/NUL at construction.
+- Transport never sends a bearer token over plaintext: HTTPS check before the
+  request and `https_only` across the redirect chain; tokens are redacted in
+  `Debug`.
+- The safetensors header is capped at 100 MB before parsing (DoS guard), and
+  all span arithmetic is checked `u64`.
