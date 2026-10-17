@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — S3: model specs (2026-10-17)
+
+- `model`: typed BERT `BertSpec` (strict config parsing), weight-layout
+  manifests validated against parsed safetensors, tokenizer
+  compatibility check, and the Ijima swap-boundary port plan.
+- Fixed (review round 1): `check_tokenizer_compatibility` checks token-ID
+  capacity (max emittable id + 1 ≤ vocab_size) instead of cardinality —
+  sparse vocab ids can no longer overflow the embedding table; vocab-padded
+  (smaller-than-table) tokenizers are accepted as legal.
+
 ### Added — S2: WordPiece tokenizer (2026-10-16)
 
 - `katakuri::tokenizer`: bespoke BERT-class WordPiece engine, replacing

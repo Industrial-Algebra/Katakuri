@@ -172,6 +172,23 @@ pub enum KatakuriError {
         direction: String,
     },
 
+    /// A `config.json` value is malformed, missing, or outside the
+    /// supported BERT subset. `detail` names the field and the problem.
+    #[error("invalid model config: {detail}")]
+    InvalidConfigJson {
+        /// Field-level description of the divergence.
+        detail: String,
+    },
+
+    /// A parsed weight set diverges from the spec's layout manifest.
+    /// `detail` lists every divergence found (missing, unexpected,
+    /// wrong-shape, wrong-dtype), one per line.
+    #[error("weight layout mismatch: {detail}")]
+    WeightLayoutMismatch {
+        /// All divergences, one per line.
+        detail: String,
+    },
+
     /// A `tokenizer.json` is malformed: a required field is missing or has
     /// the wrong shape (model vocab, added-token entries, truncation
     /// parameters, added-token id/content mismatch against the vocab).
