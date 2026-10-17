@@ -20,11 +20,12 @@ strategies/directions, added-token flags, divergent special-token maps,
 out-of-subset activations, impossible layer counts. Silent divergence is the
 worst failure mode for a data plane, and the design treats it as such.
 
-**Review density.** Twenty verified findings across four review loops, seven
-of them correctness- or security-critical — namespace shadowing, token
-redaction, redirect downgrade, final-sigma divergence, sparse-id overflow, two
-32-bit wraps. Several would have shipped silently; all are now regression-held
-and published
+**Review density.** Twenty-two root findings across four review loops; twenty
+fixed here with regressions, nine of them correctness- or security-critical
+(P1s) — namespace shadowing, case-fold aliasing, token redaction, redirect
+downgrade, final-sigma divergence, the empty-token infinite loop, sparse-id
+capacity, and two 32-bit arithmetic traps. Several would have shipped
+silently; all are now regression-held and published
 (`book/src/design/review-record.md`).
 
 **A boundary that survived contact with consumers.** The dependency ledger is

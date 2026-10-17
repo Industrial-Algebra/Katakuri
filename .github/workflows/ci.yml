@@ -95,8 +95,16 @@ jobs:
           [ "$code" -eq 2 ] || { echo "expected exit 2, got $code"; exit 1; }
       - run: cargo run --example inspect-safetensors --quiet -- tests/fixtures/tiny-model.safetensors
       - run: cargo run --example encode-text --quiet
-      - name: fetch-and-validate offline (committed fixtures)
-        run: cargo run --example fetch-and-validate --features hub-net --quiet -- --offline
+      # fetch-and-validate: fresh runners have an EMPTY hub cache, so the
+      # offline path alone would miss. Run online first (network available;
+      # ~90 MB into the job-local cache), then offline to prove the
+      # digest-verified cache re-serve — both deterministically.
+      - name: fetch-and-validate online (fresh cache) then offline
+        env:
+          KATAKURI_HUB_DIR: ${{ runner.temp }}/katakuri-hub
+        run: |
+          cargo run --example fetch-and-validate --features hub-net --quiet
+          cargo run --example fetch-and-validate --features hub-net --quiet -- --offline
       - run: cargo build --examples --features hub-net
 
   wasm:
