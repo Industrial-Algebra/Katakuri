@@ -531,12 +531,21 @@ pub struct UreqFetcher {
 
 #[cfg(feature = "hub-net")]
 impl UreqFetcher {
+    /// Agent shared by both constructors: HTTPS-only across the whole
+    /// redirect chain — an https→http redirect downgrade refuses to
+    /// connect rather than leaking the bearer or accepting plaintext
+    /// bytes (review round 2).
+    fn https_only_agent() -> ureq::Agent {
+        let config = ureq::Agent::config_builder().https_only(true).build();
+        ureq::Agent::new_with_config(config)
+    }
+
     /// Unauthenticated (public repos; ~3000 requests / 5 min).
     #[must_use]
     pub fn new() -> Self {
         Self {
             token: None,
-            agent: ureq::Agent::new_with_defaults(),
+            agent: Self::https_only_agent(),
         }
     }
 
@@ -545,7 +554,7 @@ impl UreqFetcher {
     pub fn with_token(token: impl Into<String>) -> Self {
         Self {
             token: Some(token.into()),
-            agent: ureq::Agent::new_with_defaults(),
+            agent: Self::https_only_agent(),
         }
     }
 }
