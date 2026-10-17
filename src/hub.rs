@@ -12,15 +12,26 @@
 //! # Cache layout
 //!
 //! Files live under a hub root (`$KATAKURI_HUB_DIR`, else
-//! `$HOME/.cache/katakuri/hub`) as:
+//! `$HOME/.cache/katakuri/hub`). Content, digest sidecars, and temporary
+//! files occupy separate namespaces, so a fetched file can never be mistaken
+//! for a sidecar:
 //!
 //! ```text
-//! {root}/{owner}~{model}/{revision}/{filename}
-//! {root}/{owner}~{model}/{revision}/{filename}.sha256
+//! {root}/{owner}~{model}/{revision}/content/{filename}
+//! {root}/{owner}~{model}/{revision}/digests/{filename}
 //! ```
 //!
-//! The sidecar holds the lowercase-hex sha256 of the content plus a trailing
-//! newline.
+//! The sidecar under `digests/` holds the lowercase-hex sha256 of the content
+//! plus a trailing newline and is named **exactly** the filename — a fetched
+//! file, which may legally be named like anything (including `*.sha256`), can
+//! only ever land under `content/`, never in the `digests/` namespace.
+//!
+//! Every case-bearing path component (owner, model, revision, filename) is
+//! case-safe encoded: an ASCII uppercase `X` becomes `^` + `lowercase(X)`, and
+//! `^` is outside the segment grammar, so encoded components contain no
+//! uppercase letters. Case-insensitive filesystems (macOS/Windows defaults)
+//! therefore compare encoded paths exactly as a case-sensitive one would:
+//! revisions `V1`/`v1` or names `Config.json`/`config.json` cannot alias.
 //!
 //! # The digest-on-read guarantee
 //!
@@ -41,7 +52,7 @@
 //! # The transport seam
 //!
 //! [`Fetch`] is a dependency-free trait. The crate core ships no
-//! implementation; [`UreqFetcher`] (feature `hub-net`) is the
+//! implementation; `UreqFetcher` (feature `hub-net`) is the
 //! batteries-included one, and tests run on fakes. This keeps the hub
 //! testable hermetically and keeps the default crate dependency-light. Errors
 //! flow through the crate's central [`crate::error::KatakuriError`].
@@ -105,16 +116,23 @@ impl RepoId {
         }
     }
 
-    /// The `{owner}~{model}` cache-directory component.
+    /// The `{enc(owner)}~{enc(model)}` cache-directory component.
     ///
     /// `~` is outside the segment grammar (ASCII alnum + `-._`), so the
     /// join is injective: distinct [`RepoId`]s can never share a cache
     /// directory. A `--` separator would be forgeable — `m/--x` and
     /// `m--/-x` would both render `m----x` and silently alias two repos'
     /// files (digest-verified, so the confusion would go undetected).
-    /// Caught in orchestrator verify against the S4 contract.
+    /// Caught in orchestrator verify against the S4 contract. Each half is
+    /// additionally case-safe encoded (see `encode_case_safe`) so that
+    /// `Owner/Model` and `owner/model` cannot alias on case-insensitive
+    /// filesystems.
     fn cache_dir_component(&self) -> String {
-        format!("{}~{}", self.owner, self.model)
+        format!(
+            "{}~{}",
+            encode_case_safe(&self.owner),
+            encode_case_safe(&self.model)
+        )
     }
 }
 
@@ -205,9 +223,31 @@ fn unsafe_path(segment: &str, reason: &str) -> KatakuriError {
     }
 }
 
+/// Case-safe encoding for a path component: every ASCII uppercase letter `X`
+/// becomes `^` + `lowercase(X)`; every other character passes through
+/// unchanged.
+///
+/// `^` is outside the segment grammar (ASCII alnum + `-._`), so the escape is
+/// unambiguous. The encoded string contains no uppercase ASCII, so two
+/// components differing only by case map to distinct encoded strings that stay
+/// distinct on a case-insensitive filesystem — `cache_path` is injective
+/// across case aliases (owner, model, revision, filename).
+fn encode_case_safe(seg: &str) -> String {
+    let mut out = String::with_capacity(seg.len());
+    for ch in seg.chars() {
+        if ch.is_ascii_uppercase() {
+            out.push('^');
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 /// The transport seam. Implementations fetch `url` over HTTPS
 /// (following redirects per HTTP semantics) and return the response body. The
-/// hub core ships no implementation — [`UreqFetcher`] (feature `hub-net`) is
+/// hub core ships no implementation — `UreqFetcher` (feature `hub-net`) is
 /// the batteries-included one, and tests run on fakes: the trait keeps the
 /// crate dep-free and hermetic.
 pub trait Fetch: Send + Sync + fmt::Debug {
@@ -237,12 +277,17 @@ pub enum Policy {
 
 /// Revision-keyed, content-addressed model-file cache + fetcher.
 ///
-/// Layout (digest file carries lowercase hex sha256 + `\n`):
+/// Layout (digest sidecar carries lowercase hex sha256 + `\n`):
 ///
 /// ```text
-/// {root}/{owner}~{model}/{revision}/{filename}
-/// {root}/{owner}~{model}/{revision}/{filename}.sha256
+/// {root}/{owner}~{model}/{revision}/content/{filename}
+/// {root}/{owner}~{model}/{revision}/digests/{filename}
 /// ```
+///
+/// Owner, model, revision, and filename are case-safe encoded
+/// (`encode_case_safe`): uppercase ASCII becomes `^` + lowercase, so encoded
+/// components contain no uppercase and cannot alias on case-insensitive
+/// filesystems.
 ///
 /// Guarantee: a path returned by [`Hub::get`] held bytes whose sha256 matched
 /// the sidecar digest at return time, and every subsequent [`Hub::cached`] hit
@@ -367,8 +412,9 @@ impl Hub {
         );
         self.root
             .join(repo.cache_dir_component())
-            .join(rev.as_str())
-            .join(filename)
+            .join(encode_case_safe(rev.as_str()))
+            .join("content")
+            .join(encode_case_safe(filename))
     }
 }
 
@@ -382,19 +428,25 @@ fn resolve_url(repo: &RepoId, rev: &Revision, filename: &str) -> String {
     )
 }
 
-/// The sidecar digest path for a content path: appends `.sha256`.
-fn sidecar_path(path: &Path) -> PathBuf {
-    let mut name = path.file_name().unwrap_or_default().to_os_string();
-    name.push(".sha256");
-    path.with_file_name(name)
+/// The digest-sidecar path for a content path: the sibling `digests/`
+/// directory, holding a file named exactly the (encoded) filename — never a
+/// suffixed name, so a fetched file cannot shadow a sidecar.
+fn sidecar_path(content_path: &Path) -> PathBuf {
+    let filename = content_path.file_name().unwrap_or_default();
+    let digests = content_path.parent().and_then(Path::parent).map_or_else(
+        || PathBuf::from("digests"),
+        |rev_dir| rev_dir.join("digests"),
+    );
+    digests.join(filename)
 }
 
-/// The per-process temporary path for an atomic write: appends
-/// `.tmp-{process id}`.
+/// The per-process temporary path for an atomic write:
+/// `.tmp-{process id}-{filename}` in the **same directory** as the target, so
+/// the rename stays atomic. Applied to both content and digest writes.
 fn tmp_path(path: &Path) -> PathBuf {
-    let mut name = path.file_name().unwrap_or_default().to_os_string();
-    name.push(format!(".tmp-{}", std::process::id()));
-    path.with_file_name(name)
+    let mut name = std::ffi::OsString::from(format!(".tmp-{}-", std::process::id()));
+    name.push(path.file_name().unwrap_or_default());
+    path.parent().unwrap_or_else(|| Path::new(".")).join(name)
 }
 
 /// Writes `bytes` to `path` atomically: full write to a sibling temp file,
@@ -432,12 +484,46 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     out
 }
 
+/// Refuses a URL that is not HTTPS. A bearer token (or any model bytes) must
+/// never transit plaintext HTTP, so this is checked before the request is
+/// built. Pure and unit-tested.
+///
+/// # Errors
+/// [`crate::error::KatakuriError::HubFetch`] naming the offending scheme.
+#[cfg_attr(not(feature = "hub-net"), allow(dead_code))]
+fn require_https(url: &str) -> Result<(), KatakuriError> {
+    if url.starts_with("https://") {
+        return Ok(());
+    }
+    let scheme = url.split_once("://").map_or(url, |(scheme, _)| scheme);
+    Err(KatakuriError::HubFetch {
+        detail: format!("refusing non-HTTPS URL ({scheme:?}): {url}"),
+    })
+}
+
+/// Requires the final (post-redirect) response status to be exactly 200.
+/// ureq follows redirects itself; Hugging Face's `resolve` URLs answer the
+/// last hop with 200, so any other status (a 204, a 304, …) is a failed fetch
+/// rather than empty content to be cached. Pure and unit-tested.
+///
+/// # Errors
+/// [`crate::error::KatakuriError::HubFetch`] naming the URL and status.
+#[cfg_attr(not(feature = "hub-net"), allow(dead_code))]
+fn require_final_status(url: &str, status: u16) -> Result<(), KatakuriError> {
+    if status == 200 {
+        return Ok(());
+    }
+    Err(KatakuriError::HubFetch {
+        detail: format!("GET {url}: unexpected final status {status}, expected 200"),
+    })
+}
+
 /// Blocking HTTPS transport over ureq/rustls (feature `hub-net`).
 ///
 /// Follows redirects (Hub `resolve` URLs 307 to a signed CDN link). Optional
-/// `Authorization: Bearer` token for gated repos / higher rate limits.
+/// `Authorization: Bearer` token for gated repos / higher rate limits. The
+/// token is never rendered by [`fmt::Debug`].
 #[cfg(feature = "hub-net")]
-#[derive(Debug)]
 pub struct UreqFetcher {
     token: Option<String>,
     agent: ureq::Agent,
@@ -465,6 +551,17 @@ impl UreqFetcher {
 }
 
 #[cfg(feature = "hub-net")]
+impl fmt::Debug for UreqFetcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Never render the secret: `Some(<redacted>)` or `None` only.
+        let token = self.token.as_ref().map_or("None", |_| "Some(<redacted>)");
+        f.debug_struct("UreqFetcher")
+            .field("token", &format_args!("{token}"))
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "hub-net")]
 impl Default for UreqFetcher {
     fn default() -> Self {
         Self::new()
@@ -476,6 +573,8 @@ impl Fetch for UreqFetcher {
     fn fetch(&self, url: &str) -> Result<Vec<u8>, KatakuriError> {
         use std::io::Read as _;
 
+        require_https(url)?;
+
         let mut request = self.agent.get(url);
         if let Some(token) = &self.token {
             request = request.header("Authorization", format!("Bearer {token}"));
@@ -483,6 +582,7 @@ impl Fetch for UreqFetcher {
         let response = request.call().map_err(|e| KatakuriError::HubFetch {
             detail: format!("GET {url}: {e}"),
         })?;
+        require_final_status(url, response.status().as_u16())?;
 
         // Read one byte past the ceiling so an over-limit body is detected
         // rather than silently truncated.
@@ -755,10 +855,35 @@ mod tests {
         let path = hub.cache_path(&repo, &rev, "config.json");
         let sep = std::path::MAIN_SEPARATOR;
         assert!(
-            path.to_string_lossy()
-                .ends_with(&format!("owner~model{sep}v1.0-tags{sep}config.json")),
+            path.to_string_lossy().ends_with(&format!(
+                "owner~model{sep}v1.0-tags{sep}content{sep}config.json"
+            )),
             "unexpected cache path: {}",
             path.display()
+        );
+
+        // The digest sidecar lives in a sibling namespace, same filename.
+        let digest = sidecar_path(&path);
+        assert!(
+            digest.to_string_lossy().ends_with(&format!(
+                "owner~model{sep}v1.0-tags{sep}digests{sep}config.json"
+            )),
+            "unexpected sidecar path: {}",
+            digest.display()
+        );
+
+        // Case is encoded away in every component.
+        let upper = hub.cache_path(
+            &RepoId::parse("Owner/Model").unwrap(),
+            &Revision::new("V1.0-Tags").unwrap(),
+            "Config.json",
+        );
+        assert!(
+            upper.to_string_lossy().ends_with(&format!(
+                "^owner~^model{sep}^v1.0-^tags{sep}content{sep}^config.json"
+            )),
+            "unexpected encoded cache path: {}",
+            upper.display()
         );
     }
 
@@ -790,6 +915,139 @@ mod tests {
                 .to_string_lossy()
                 .contains("~gpt2")
         );
+    }
+
+    #[test]
+    fn sidecar_namespaces_separated() {
+        let root = temp_root("sidecar-ns");
+        let fetcher = std::sync::Arc::new(CountingFetcher::new(b"B1".to_vec()));
+        let hub = Hub::new(&root, fetcher.clone());
+        let repo = RepoId::parse("owner/model").unwrap();
+        let rev = Revision::main();
+
+        let x = hub.get(&repo, &rev, "x").unwrap();
+        assert_eq!(std::fs::read(&x).unwrap(), b"B1");
+        assert_eq!(x.parent().unwrap().file_name().unwrap(), "content");
+        let x_digest = sidecar_path(&x);
+        assert_eq!(x_digest.parent().unwrap().file_name().unwrap(), "digests");
+        assert_eq!(x_digest.file_name().unwrap(), "x");
+        assert_eq!(
+            std::fs::read_to_string(&x_digest).unwrap().trim(),
+            sha256_hex(b"B1")
+        );
+
+        // A fetched file NAMED like a sidecar still lands under `content/`,
+        // never in the `digests/` namespace that sidecars occupy.
+        fetcher.set_body(b"B2".to_vec());
+        let fake_sidecar_named = hub.get(&repo, &rev, "x.sha256").unwrap();
+        assert_eq!(std::fs::read(&fake_sidecar_named).unwrap(), b"B2");
+        assert_eq!(
+            fake_sidecar_named.parent().unwrap().file_name().unwrap(),
+            "content"
+        );
+        assert_eq!(fake_sidecar_named.file_name().unwrap(), "x.sha256");
+        assert_ne!(fake_sidecar_named, x_digest);
+
+        // The original entry's digest is untouched: `get("x")` still verifies
+        // and serves the original bytes (no fetch, it is a digest hit).
+        assert_eq!(
+            std::fs::read_to_string(&x_digest).unwrap().trim(),
+            sha256_hex(b"B1")
+        );
+        let calls_before = fetcher.calls();
+        assert_eq!(hub.get(&repo, &rev, "x").unwrap(), x);
+        assert_eq!(std::fs::read(&x).unwrap(), b"B1");
+        assert_eq!(fetcher.calls(), calls_before, "get(\"x\") must be a hit");
+
+        // `digests` is itself a legal segment: fetching it targets
+        // `content/digests`, never the namespace directory.
+        fetcher.set_body(b"B3".to_vec());
+        let d = hub.get(&repo, &rev, "digests").unwrap();
+        assert_eq!(d.parent().unwrap().file_name().unwrap(), "content");
+        assert_eq!(d.file_name().unwrap(), "digests");
+        assert!(d.is_file());
+        assert!(!d.is_dir());
+        assert_eq!(
+            d,
+            x.parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("content")
+                .join("digests")
+        );
+    }
+
+    #[test]
+    fn case_safe_paths_injective() {
+        let hub = Hub::new(
+            PathBuf::from("/tmp/katakuri-hub-case"),
+            std::sync::Arc::new(PanickyFetcher),
+        );
+        let rev = Revision::main();
+
+        // Owner/model case pair.
+        let upper_repo = RepoId::parse("Owner/Model").unwrap();
+        let lower_repo = RepoId::parse("owner/model").unwrap();
+        assert_ne!(
+            hub.cache_path(&upper_repo, &rev, "config.json"),
+            hub.cache_path(&lower_repo, &rev, "config.json")
+        );
+
+        // Revision + filename case pair.
+        let upper_path = hub.cache_path(&upper_repo, &Revision::new("V1").unwrap(), "Config.json");
+        let lower_path = hub.cache_path(&upper_repo, &Revision::new("v1").unwrap(), "config.json");
+        assert_ne!(upper_path, lower_path);
+
+        // No uppercase survives encoding, and `^` marks every uppercase that was.
+        let rendered = upper_path.to_string_lossy();
+        assert!(
+            !rendered.chars().any(|c| c.is_ascii_uppercase()),
+            "encoded path retains uppercase: {rendered}"
+        );
+        assert!(rendered.contains("^owner"), "owner not encoded: {rendered}");
+        assert!(rendered.contains("^model"), "model not encoded: {rendered}");
+        assert!(rendered.contains("^v1"), "revision not encoded: {rendered}");
+        assert!(
+            rendered.contains("^config.json"),
+            "filename not encoded: {rendered}"
+        );
+    }
+
+    #[cfg(feature = "hub-net")]
+    #[test]
+    fn bearer_token_redacted_in_debug() {
+        let rendered = format!("{:?}", UreqFetcher::with_token("hf-secret-xyz"));
+        assert!(
+            rendered.contains("redacted"),
+            "Debug did not redact the token: {rendered}"
+        );
+        assert!(
+            !rendered.contains("hf-secret-xyz"),
+            "Debug leaked the bearer token: {rendered}"
+        );
+    }
+
+    #[test]
+    fn require_final_status_matrix() {
+        assert!(require_final_status("https://x/y", 200).is_ok());
+        for status in [204u16, 301, 304, 404, 500] {
+            let err = require_final_status("https://x/y", status).unwrap_err();
+            let msg = err.to_string();
+            assert!(
+                msg.contains(&status.to_string()),
+                "error for {status} did not name the status: {msg:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn require_https_rejects_plain_http() {
+        assert!(require_https("http://x").is_err());
+        assert!(require_https("https://x").is_ok());
+        // Scheme prefix is case-sensitive: `HTTP://` is not `https://`.
+        assert!(require_https("HTTP://x").is_err());
+        assert!(require_https("ftp://x").is_err());
     }
 
     #[test]

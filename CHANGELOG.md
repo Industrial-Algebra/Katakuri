@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `hub`: optional fetch + content-addressed cache (offline-first,
   digest-verified reads); `hub-net` adds ureq/rustls transport.
+- Fixed (review round 1): cache layout separates content/digests/tmp
+  namespaces (sidecar-shadowing), case-safe path encoding
+  (case-insensitive filesystems), redacted Debug for bearer tokens,
+  strict final-200 status check, HTTPS-only transport for token requests,
+  feature-safe doc links.
 
 ### Added — S3: model specs (2026-10-17)
 
