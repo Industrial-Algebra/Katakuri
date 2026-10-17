@@ -1,6 +1,64 @@
 [package]
-name = "Katakuri"
+name = "katakuri"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "Model ecosystem layer over Zunesha — safetensors weight loading, WordPiece tokenization, architecture specs, and hub access. Never computes."
+license = "Apache-2.0"
+repository = "https://github.com/Industrial-Algebra/Katakuri"
+keywords = ["safetensors", "tokenization", "wordpiece", "model-weights", "bert"]
+categories = ["science", "parser-implementations"]
+readme = "README.md"
+
+[features]
+default = ["std"]
+std = []
+# Borsalino-pattern verification obligations (karpal stack).
+verify = ["dep:karpal-verify", "dep:karpal-proof"]
+# S4 hub: content-addressed cache (sha2 only; zero-dep transport seam).
+hub = ["dep:sha2"]
+# S4 hub-net: blocking ureq/rustls transport on top of hub.
+hub-net = ["hub", "dep:ureq"]
 
 [dependencies]
+thiserror = "2"
+# Header parsing: the safetensors header IS JSON; serde_json is the
+# ecosystem-standard, dependency-light parser (serde/itoa/ryu/memchr only).
+serde_json = "1"
+# The device substrate: Buffer upload + the NoDeviceStub host path.
+zunesha = "0.1.2"
+# Verification stack, feature-gated per the Borsalino pattern.
+karpal-verify = { version = "0.6.1", optional = true }
+karpal-proof = { version = "0.6.1", optional = true }
+# Unicode tables the tokenizers reference implementation itself uses —
+# parity requires identical category tables and NFD.
+unicode-normalization = "0.1"
+unicode_categories = "0.1"
+# S4 hub: content addressing — every cache read is digest-verified.
+sha2 = { version = "0.11", optional = true }
+# S4 hub-net: blocking HTTPS with rustls; redirect-following; no async
+# runtime. Optional — the transport seam (Fetch trait) is dep-free.
+ureq = { version = "3.4", optional = true, default-features = false, features = ["rustls"] }
+
+# NOTE: Katakuri never computes — no forward passes, no autodiff, no optimizers,
+# no kernels, no shader compilation. That boundary is the architectural contract
+# (docs/plans/2026-10-16-katakuri-architecture-handover.md §4.1).
+#
+# Dependency ledger (no silent growth — every entry justified in the PR):
+# - thiserror 2: central error enum (IA standard, same as Zunesha)
+# - serde_json 1: safetensors header parse (the format is JSON)
+# - zunesha 0.1.2: device upload + NoDevice host path (the substrate)
+# - karpal-verify/proof 0.6.1: verify-feature obligations (Borsalino pattern,
+#   pinned to Borsalino's own pin)
+# - unicode-normalization 0.1: NFD for accent stripping (S2 tokenizer)
+# - unicode_categories 0.1: is_other/is_mark_nonspacing/is_punctuation
+#   predicates (S2 tokenizer; the reference implementation's own crate)
+# - sha2 0.11 (feature `hub`): sha256 for the content-addressed cache;
+#   every cache read is digest-verified (S4 hub)
+# - ureq 3.4 (feature `hub-net`): blocking HTTPS transport with rustls,
+#   redirect-following, no async runtime (S4 hub-net; Fetch seam is dep-free)
+
+# Declare the `kani` cfg so `#[cfg(kani)]` (lib.rs module gate) does not trip
+# rustc's `unexpected_cfgs` lint under `-D warnings`. Inert outside Kani.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
