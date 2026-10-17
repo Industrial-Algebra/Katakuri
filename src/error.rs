@@ -218,4 +218,29 @@ pub enum KatakuriError {
         #[from]
         zunesha::DeviceError,
     ),
+
+    /// A repo id, revision, or filename fails the strict path-safety
+    /// grammar (empty segment, `/`, `..`, NUL, or a character outside
+    /// ASCII alnum + `-._`).
+    #[error("unsafe repo path: {detail}")]
+    UnsafeRepoPath {
+        /// What was rejected and why.
+        detail: String,
+    },
+
+    /// Transport failure while fetching a model file (DNS, TLS, HTTP
+    /// status, body read, size cap).
+    #[error("hub fetch failed: {detail}")]
+    HubFetch {
+        /// Transport-level description.
+        detail: String,
+    },
+
+    /// Local cache failure (unusable root, IO error, corrupt entry that
+    /// cannot be repaired by refetch).
+    #[error("hub cache error: {detail}")]
+    HubCache {
+        /// Cache-level description.
+        detail: String,
+    },
 }

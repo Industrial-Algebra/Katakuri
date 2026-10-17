@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — S4: hub (2026-10-17)
+
+- `hub`: optional fetch + content-addressed cache (offline-first,
+  digest-verified reads); `hub-net` adds ureq/rustls transport.
+
 ### Added — S3: model specs (2026-10-17)
 
 - `model`: typed BERT `BertSpec` (strict config parsing), weight-layout
