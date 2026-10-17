@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test (${{ matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: ["", "verify", "hub", "hub-net", "all"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: |
+          case "${{ matrix.features }}" in
+            all) cargo test --all-features ;;
+            "")  cargo test ;;
+            *)   cargo test --features "${{ matrix.features }}" ;;
+          esac
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # Zero warnings on default AND all-features — the session gate matrix.
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --check
+
+  docs:
+    name: Rustdoc (${{ matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Strict doc gates per feature combination (the S4-r2 lesson).
+        features: ["", "verify", "hub", "hub-net"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo doc
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          if [ -z "${{ matrix.features }}" ]; then
+            cargo doc --no-deps
+          else
+            cargo doc --no-deps --features "${{ matrix.features }}"
+          fi
+
+  examples:
+    name: Examples compile and run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run --example inspect-safetensors --quiet || true
+      - run: cargo run --example encode-text --quiet
+      - run: cargo build --examples --features hub-net
+
+  wasm:
+    name: wasm32 build (width-correctness targets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      # The S3/S4 review loops verified 32-bit width correctness on this
+      # target; keep it compiling.
+      - run: cargo check --target wasm32-unknown-unknown --features hub
