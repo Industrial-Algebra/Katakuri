@@ -38,3 +38,12 @@ jobs:
           fi
       - name: cargo publish
         run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+  announce:
+    needs: publish
+    uses: Industrial-Algebra/IA-home/.github/workflows/release-announce.yml@main
+    with:
+      product_name: "Katakuri"
+      version: ${{ github.ref_name }}
+      release_notes: "See the changelog: https://github.com/Industrial-Algebra/Katakuri/blob/main/CHANGELOG.md"
+    secrets:
+      ADMIN_API_KEY: ${{ secrets.IA_BLOG_API_KEY }}
