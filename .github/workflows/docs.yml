@@ -8,7 +8,7 @@ on:
 
 jobs:
   book:
-    name: Build book (artifact)
+    name: Build and deploy book
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +16,7 @@ jobs:
         run: |
           curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.5.4/mdbook-v0.5.4-x86_64-unknown-linux-gnu.tar.gz | tar -xz
           sudo mv mdbook /usr/local/bin/
-      - run: ./mdbook build
+      - run: mdbook build
       - name: Deploy to Netlify
         run: |
           npm install -g netlify-cli
