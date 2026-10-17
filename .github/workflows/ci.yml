@@ -84,8 +84,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # No `|| true`: assert real exit codes. Usage error must exit 2;
-      # the fixture path must succeed; fetch-and-validate runs offline
-      # against the committed fixtures (no network in CI).
+      # the fixture paths must succeed; fetch-and-validate runs
+      # online-then-offline against a fresh cache (step below).
       - name: inspect-safetensors usage error exits 2
         run: |
           set +e
