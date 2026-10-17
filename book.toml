@@ -1,0 +1,15 @@
+[book]
+title = "Katakuri"
+description = "Model ecosystem layer over Zunesha — weights, tokenization, specs, and hub access. Never computes."
+authors = ["Industrial Algebra"]
+language = "en"
+src = "book/src"
+
+[build]
+build-dir = "book/book"
+
+[output.html]
+additional-css = ["book/theme/custom.css"]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/Industrial-Algebra/Katakuri"
