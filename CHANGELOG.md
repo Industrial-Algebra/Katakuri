@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Nothing yet — the `0.1.0` items below ship together as the first release.
 
-## [0.1.0] — pending publish
+## [0.1.0] — 2026-10-17
 
 Undated on purpose: `cargo publish` and the `v0.1.0` tag make it real, and the
 operator's tag push finalizes it. Everything below landed between 2026-10-16
