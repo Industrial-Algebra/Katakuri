@@ -41,14 +41,18 @@
 //! - [`model`] — typed BERT config + weight-layout manifests, validated
 //!   against parsed safetensors; the Ijima swap boundary (S3). Replaces
 //!   candle-transformers `models::bert`.
-//! - [`hub`] — model fetch + content-addressed cache over plain HTTPS,
-//!   offline-first. Replaces `hf-hub`. Optional feature; lands with S4.
+//! - `hub` (optional `hub` feature) — model fetch + content-addressed
+//!   cache over plain HTTPS, offline-first; `hub-net` adds the ureq/rustls
+//!   transport. Replaces `hf-hub`. Lands with S4.
 //!
 //! ## Features
 //!
 //! - `std` (default): standard-library support
 //! - `verify`: karpal-verify obligation bundles for the parse invariants
 //!   (the Borsalino verification pattern, adapted to a parser crate)
+//! - `hub`: model fetch + content-addressed cache, offline-first
+//!   (adds `sha2` for digest verification)
+//! - `hub-net`: the blocking ureq/rustls HTTPS transport on top of `hub`
 //!
 //! ## Kani harnesses
 //!
@@ -81,6 +85,7 @@
 #![warn(missing_docs)]
 
 pub mod error;
+#[cfg(feature = "hub")]
 pub mod hub;
 pub mod model;
 pub mod safetensors;
