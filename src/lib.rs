@@ -41,6 +41,9 @@
 //! - [`model`] — typed BERT config + weight-layout manifests, validated
 //!   against parsed safetensors; the Ijima swap boundary (S3). Replaces
 //!   candle-transformers `models::bert`.
+//! - [`manifest`] — the typed layout manifest shared with `borsalino-tensor`
+//!   (the T0 co-sign type, unstable until both sessions review it). Pure
+//!   data: no device or buffer dependency (S5).
 //! - `digest` (optional `digest` feature) — canonical sha256 identities for
 //!   local artifacts; the hub depends on it, not the other way round (S5).
 //! - `hub` (optional `hub` feature) — model fetch + content-addressed
@@ -93,6 +96,7 @@ pub mod error;
 pub mod digest;
 #[cfg(feature = "hub")]
 pub mod hub;
+pub mod manifest;
 pub mod model;
 pub mod safetensors;
 pub mod tokenizer;
