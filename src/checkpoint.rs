@@ -344,24 +344,36 @@ fn open_checkpoint(path: &Path, nofollow: bool) -> Result<File, KatakuriError> {
 /// `O_NOFOLLOW` for the target ABI, where a known value exists.
 ///
 /// The value is not exposed by `std`, and pulling in `libc` for one constant
-/// would add a dependency for a platform table. Linux/Android use `0400000`;
-/// the BSD/macOS family uses `0x100`.
+/// would add a dependency for a platform table. Values match the `libc`
+/// crate (each OS's `fcntl.h`):
+///
+/// - Linux/Android (asm-generic): `0o400000` = 0x20000
+/// - macOS/iOS (Darwin): `0x10000`
+/// - FreeBSD: `0x20000`
+/// - NetBSD/OpenBSD: `0x400000`
+///
+/// DragonFly is deliberately NOT mapped — its value was not verified against
+/// its `fcntl.h`, so it takes the documented fallback (`symlink_metadata`
+/// pre-check + post-open `fstat`) rather than a guessed flag. A wrong value
+/// here is worse than none: it both fails to reject symlinks AND sets an
+/// unrelated open flag on that ABI.
 #[cfg(unix)]
 fn unix_nofollow_flag() -> Option<i32> {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         Some(0o400000)
     }
-    #[cfg(any(
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd",
-        target_os = "dragonfly"
-    ))]
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
-        Some(0x100)
+        Some(0x0001_0000)
+    }
+    #[cfg(target_os = "freebsd")]
+    {
+        Some(0x0002_0000)
+    }
+    #[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
+    {
+        Some(0x0040_0000)
     }
     #[cfg(not(any(
         target_os = "linux",
@@ -370,8 +382,7 @@ fn unix_nofollow_flag() -> Option<i32> {
         target_os = "ios",
         target_os = "freebsd",
         target_os = "netbsd",
-        target_os = "openbsd",
-        target_os = "dragonfly"
+        target_os = "openbsd"
     )))]
     {
         None
