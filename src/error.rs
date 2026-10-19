@@ -243,4 +243,115 @@ pub enum KatakuriError {
         /// Cache-level description.
         detail: String,
     },
+
+    /// A checkpoint path does not resolve to a regular file — a symlink, a
+    /// FIFO, a device, a directory, or a path that does not exist. Only
+    /// produced when the trust policy's `regular_file_only` flag is set;
+    /// hardlinks resolve to a regular file and are accepted.
+    #[error("checkpoint '{path}' is not a regular file")]
+    CheckpointNotRegularFile {
+        /// The rejected path, rendered for diagnostics.
+        path: String,
+    },
+
+    /// A checkpoint's size exceeds the policy's byte cap.
+    #[error("checkpoint is {size} bytes, above the policy cap of {cap} bytes")]
+    CheckpointTooLarge {
+        /// Observed file size in bytes.
+        size: u64,
+        /// The policy's cap in bytes.
+        cap: u64,
+    },
+
+    /// Opening, stating, or reading a checkpoint file failed.
+    #[error("checkpoint I/O error for '{path}': {detail}")]
+    CheckpointIo {
+        /// The path involved, rendered for diagnostics.
+        path: String,
+        /// The underlying operating-system error description.
+        detail: String,
+    },
+
+    /// The declared `ia.schema-hash` does not match the canonical hash of the
+    /// parsed [`MlpSpec`](crate::model::MlpSpec). `expected` is `"<absent>"`
+    /// when the key was required by policy but missing.
+    #[error("schema hash mismatch: declared {expected}, computed {actual}")]
+    SchemaHashMismatch {
+        /// The digest declared in checkpoint metadata (or `"<absent>"`).
+        expected: String,
+        /// The digest computed over the parsed spec's canonical JSON.
+        actual: String,
+    },
+
+    /// The declared `ia.model-hash` does not match the sha256 of the
+    /// safetensors data section. `expected` is `"<absent>"` when the key was
+    /// required by policy but missing.
+    #[error("model hash mismatch: declared {expected}, computed {actual}")]
+    ModelHashMismatch {
+        /// The digest declared in checkpoint metadata (or `"<absent>"`).
+        expected: String,
+        /// The digest computed over the data section bytes.
+        actual: String,
+    },
+
+    /// An F32 tensor element is NaN or ±Infinity, and the trust policy's
+    /// `reject_nonfinite` scan is on. Subnormals are finite and never produce
+    /// this error.
+    #[error("tensor '{tensor}' contains {which} (nonfinite values are rejected by policy)")]
+    NonfiniteTensorValue {
+        /// Canonical tensor name carrying the offending element.
+        tensor: String,
+        /// Which kind of nonfinite value was found first.
+        which: NonfiniteKind,
+    },
+
+    /// A provenance metadata entry violates its convention — for example
+    /// `ia.provenance.training-data` outside its `1..=4096` byte bound, or an
+    /// `ia.spec` value that is absent where the loader requires one.
+    #[error("provenance metadata '{key}' is malformed")]
+    ProvenanceMalformed {
+        /// The offending metadata key.
+        key: String,
+    },
+
+    /// Checkpoint `__metadata__` carries an `ia.*` key outside the S5
+    /// convention. Unknown keys reject rather than being silently ignored;
+    /// forward compatibility is a `schema_version` bump.
+    #[error("unknown ia.* metadata key '{key}'")]
+    UnknownIaMetadata {
+        /// The unrecognized key.
+        key: String,
+    },
+
+    /// An `ia-mlp` architecture spec is malformed, missing a required field,
+    /// or outside the supported bounds (the strict-grammar family, mirroring
+    /// [`InvalidConfigJson`](Self::InvalidConfigJson) for `BertSpec`).
+    #[error("invalid ia-mlp spec: {detail}")]
+    MlpSpecParse {
+        /// Field-level description of the divergence.
+        detail: String,
+    },
+}
+
+/// Which nonfinite value an F32 tensor element carried, as reported by
+/// [`KatakuriError::NonfiniteTensorValue`] (S5 checkpoint scan).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NonfiniteKind {
+    /// Not-a-number (`f32::NAN`).
+    Nan,
+    /// Positive infinity (`f32::INFINITY`).
+    PositiveInfinity,
+    /// Negative infinity (`f32::NEG_INFINITY`).
+    NegativeInfinity,
+}
+
+impl std::fmt::Display for NonfiniteKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let text = match self {
+            Self::Nan => "NaN",
+            Self::PositiveInfinity => "+Inf",
+            Self::NegativeInfinity => "-Inf",
+        };
+        f.write_str(text)
+    }
 }
