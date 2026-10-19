@@ -93,6 +93,8 @@ struct CheckpointBuilder {
     tensors: Vec<Vec<f32>>,
     /// Metadata edits applied after the correct defaults are computed.
     edits: Vec<(String, Option<String>)>,
+    /// Emit tensors in reversed physical order (canonicalization tests).
+    reverse: bool,
 }
 
 impl CheckpointBuilder {
@@ -106,7 +108,17 @@ impl CheckpointBuilder {
             spec,
             tensors,
             edits: Vec::new(),
+            reverse: false,
         }
+    }
+
+    /// Emit the tensors in REVERSED physical order (offsets and the model
+    /// hash recompute to match): a load-legal non-canonical layout, for the
+    /// canonicalization tests.
+    #[must_use]
+    fn reversed(mut self) -> Self {
+        self.reverse = true;
+        self
     }
 
     /// Replace one tensor's values (index in canonical order).
@@ -131,9 +143,16 @@ impl CheckpointBuilder {
         let expected = self.spec.expected_tensors();
         assert_eq!(self.tensors.len(), expected.len(), "one payload per tensor");
 
+        /// One header slot: the tensor's (name, shape) and its payload.
+        type Slot<'a> = (&'a (String, Vec<usize>), &'a Vec<f32>);
+        let mut pairs: Vec<Slot> = expected.iter().zip(self.tensors.iter()).collect();
+        if self.reverse {
+            pairs.reverse();
+        }
+
         let mut header = serde_json::Map::new();
         let mut data: Vec<u8> = Vec::new();
-        for ((name, shape), values) in expected.iter().zip(self.tensors.iter()) {
+        for ((name, shape), values) in pairs {
             let count: usize = shape.iter().product();
             assert_eq!(values.len(), count, "payload size for {name}");
             let start = data.len();
@@ -271,14 +290,61 @@ fn fixture_passes_the_full_policy_path() {
     );
     assert!(subnormal.is_finite());
 
-    // Canonical round-trip: re-serializing tensors in manifest order
-    // reproduces the data section byte for byte.
+    // Canonical round-trip (canonically-written file): the canonical data
+    // bytes reproduce the physical data section byte for byte. For
+    // non-canonical files this equality does NOT hold — see
+    // reversed_physical_layout_canonicalizes.
     let reserialized: Vec<u8> = loaded
         .tensors
         .iter()
         .flat_map(|t| t.data.iter().copied())
         .collect();
     assert_eq!(reserialized, data_section(bytes));
+}
+
+#[test]
+fn reversed_physical_layout_loads_and_canonicalizes() {
+    // Review r1 P2: the byte-identical round-trip guarantee applies to the
+    // CANONICAL form, not the input bytes. Same tensor values, physically
+    // reversed (offsets + model-hash recomputed): loads under full policy,
+    // canonical_data_bytes equals the canonical file's — while the physical
+    // data sections differ.
+    let spec_ = spec(64, &[4, 3], "relu");
+    let shapes: Vec<usize> = spec_
+        .expected_tensors()
+        .iter()
+        .map(|(_, shape)| shape.iter().product())
+        .collect();
+    // Distinct, full-length payloads per tensor (constants differ).
+    let values: Vec<Vec<f32>> = shapes
+        .iter()
+        .enumerate()
+        .map(|(i, &n)| vec![(i + 1) as f32; n])
+        .collect();
+    let mut canonical = CheckpointBuilder::new(spec_.clone());
+    let mut reversed = CheckpointBuilder::new(spec_).reversed();
+    for (i, value) in values.iter().enumerate() {
+        canonical = canonical.tensor(i, value.clone());
+        reversed = reversed.tensor(i, value.clone());
+    }
+    let canonical = canonical.build();
+    let reversed = reversed.build();
+
+    let canon_load = load(&canonical, "canonical", &strict_policy()).expect("canonical loads");
+    let rev_load = load(&reversed, "reversed", &strict_policy()).expect("reversed loads");
+
+    assert_eq!(
+        canon_load.canonical_data_bytes(),
+        rev_load.canonical_data_bytes(),
+        "canonical form must be layout-independent"
+    );
+    assert_ne!(
+        data_section(&canonical),
+        data_section(&reversed),
+        "fixtures must genuinely differ physically"
+    );
+    // And the canonical file's canonical bytes ARE its data section.
+    assert_eq!(canon_load.canonical_data_bytes(), data_section(&canonical));
 }
 
 // ── Manifest agreement property ───────────────────────────────────

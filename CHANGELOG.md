@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] — Unreleased
 
+### Fixed — S5 review round 1
+
+- **P1 (twice-failed class):** per-ABI `O_NOFOLLOW` is now taken from `libc`
+  (unix-only target dep) — hand-derived values were wrong twice (all-BSD
+  `0x100`; then x86-64's value on aarch64 Linux, whose flag is `0x8000`).
+- **P1:** the trust-policy open now includes `O_NONBLOCK`, so a FIFO swapped
+  in between the metadata precheck and the open returns immediately for the
+  descriptor check instead of blocking indefinitely on the read end.
+- **P2:** `MlpSpec::canonical_json` is a hand-rolled fixed-key-order writer —
+  iterating `serde_json::Map` made `ia.schema-hash` depend on the map backing
+  (any downstream `preserve_order` enablement silently changed the digest);
+  the format is pinned byte-for-byte by a unit test.
+- **P2:** the round-trip guarantee is now stated and enforced over the
+  canonical form: `ValidatedCheckpoint::canonical_data_bytes()` concatenates
+  tensor data in canonical parameter order, layout-independent; a
+  reversed-physical-layout fixture test proves equal canonical bytes over
+  different file bytes.
+
 Additive minor bump: MLP architecture specs (wishlist W1), validated
 checkpoint loading (W2), and the `digest` feature re-homing (W5), plus the
 Borsalino T0 layout-manifest proposal. Undated until published; `0.1.0`

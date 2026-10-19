@@ -134,7 +134,32 @@ pub struct ValidatedCheckpoint {
     /// The full `__metadata__` string map, provenance included.
     pub metadata: BTreeMap<String, String>,
     /// Parsed tensors in canonical parameter order (the manifest's order).
+    /// The FILE's physical layout may differ — load honors offsets, it does
+    /// not require canonical arrangement; canonical ordering is a property
+    /// of this return value (and of [`ValidatedCheckpoint::canonical_data_bytes`]),
+    /// not of the input bytes.
     pub tensors: Vec<ParsedTensor>,
+}
+
+impl ValidatedCheckpoint {
+    /// The data section in canonical parameter order: every tensor's bytes,
+    /// concatenated in [`TensorManifest::entries`] order.
+    ///
+    /// This — not the input file's physical data section — is the stable
+    /// form: two checkpoints holding the same tensors in different physical
+    /// layouts load to equal `canonical_data_bytes` (review r1, P2: the
+    /// earlier "byte-identical round-trip" phrasing overstated the
+    /// guarantee; the round trip is canonicalization, and this is its byte
+    /// witness).
+    #[must_use]
+    pub fn canonical_data_bytes(&self) -> Vec<u8> {
+        let total: u64 = self.manifest.entries.iter().map(|e| e.byte_len).sum();
+        let mut out = Vec::with_capacity(usize::try_from(total).unwrap_or(0));
+        for tensor in &self.tensors {
+            out.extend_from_slice(&tensor.data);
+        }
+        out
+    }
 }
 
 /// Load a safetensors checkpoint and validate it against `policy`.
@@ -304,10 +329,12 @@ fn ensure_regular_file(path: &Path) -> Result<(), KatakuriError> {
     Ok(())
 }
 
-/// Open the checkpoint, adding `O_NOFOLLOW` on Unix when the policy demands a
-/// regular file (closing the symlink race between the metadata check and the
-/// open). Platforms without a known `O_NOFOLLOW` value fall back to the
-/// metadata + `fstat` checks.
+/// Open the checkpoint with the trust flags on Unix (`O_NOFOLLOW |
+/// O_NONBLOCK` via libc — the verified per-arch values), closing the symlink
+/// race between the metadata check and the open; `O_NONBLOCK` keeps a FIFO
+/// (swapped in after the precheck) from blocking the open. The opened
+/// descriptor is re-checked by `fstat` in [`read_checkpoint`]. Non-Unix
+/// targets keep the metadata check only (documented platform bound).
 fn open_checkpoint(path: &Path, nofollow: bool) -> Result<File, KatakuriError> {
     #[cfg_attr(not(unix), allow(unused_mut))]
     let mut options = std::fs::OpenOptions::new();
@@ -315,9 +342,14 @@ fn open_checkpoint(path: &Path, nofollow: bool) -> Result<File, KatakuriError> {
     #[cfg(unix)]
     if nofollow {
         use std::os::unix::fs::OpenOptionsExt;
-        if let Some(flag) = unix_nofollow_flag() {
-            options.custom_flags(flag);
-        }
+        // `O_NOFOLLOW`: opening through a symlink fails with `ELOOP`
+        // (re-stated as the policy failure it is below).
+        // `O_NONBLOCK` (review r1, P1): opening a FIFO read-only would
+        // BLOCK until a writer appears — the post-open `fstat` would
+        // never be reached. Nonblocking makes the open return
+        // immediately so the descriptor check can reject it. Harmless
+        // for regular files: reads are unaffected.
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
     #[cfg(not(unix))]
     let _ = nofollow;
@@ -338,54 +370,6 @@ fn open_checkpoint(path: &Path, nofollow: bool) -> Result<File, KatakuriError> {
             }
             Err(io_error(path, &e.to_string()))
         }
-    }
-}
-
-/// `O_NOFOLLOW` for the target ABI, where a known value exists.
-///
-/// The value is not exposed by `std`, and pulling in `libc` for one constant
-/// would add a dependency for a platform table. Values match the `libc`
-/// crate (each OS's `fcntl.h`):
-///
-/// - Linux/Android (asm-generic): `0o400000` = 0x20000
-/// - macOS/iOS (Darwin): `0x10000`
-/// - FreeBSD: `0x20000`
-/// - NetBSD/OpenBSD: `0x400000`
-///
-/// DragonFly is deliberately NOT mapped — its value was not verified against
-/// its `fcntl.h`, so it takes the documented fallback (`symlink_metadata`
-/// pre-check + post-open `fstat`) rather than a guessed flag. A wrong value
-/// here is worse than none: it both fails to reject symlinks AND sets an
-/// unrelated open flag on that ABI.
-#[cfg(unix)]
-fn unix_nofollow_flag() -> Option<i32> {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        Some(0o400000)
-    }
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
-    {
-        Some(0x0001_0000)
-    }
-    #[cfg(target_os = "freebsd")]
-    {
-        Some(0x0002_0000)
-    }
-    #[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
-    {
-        Some(0x0040_0000)
-    }
-    #[cfg(not(any(
-        target_os = "linux",
-        target_os = "android",
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd"
-    )))]
-    {
-        None
     }
 }
 
@@ -511,4 +495,43 @@ fn data_section(bytes: &[u8]) -> Result<&[u8], KatakuriError> {
             header_len: u64::try_from(header_len).unwrap_or(u64::MAX),
             available: bytes.len(),
         })
+}
+
+#[cfg(all(test, unix))]
+mod fifo_tests {
+    use super::*;
+
+    /// Review r1 P1: a FIFO swapped in after the metadata precheck must not
+    /// hang the open. `O_NONBLOCK` makes the read-end open return
+    /// immediately; the post-open descriptor check rejects it. If this flag
+    /// is ever lost, this test HANGS (visible CI timeout), it does not fail
+    /// fast — that is the failure mode being pinned.
+    #[test]
+    fn fifo_open_does_not_block() {
+        let dir = std::env::temp_dir().join(format!("katakuri-fifo-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("probe.fifo");
+        let _ = std::fs::remove_file(&path);
+        // SAFETY: mkfifo(path, 0o600) — path is NUL-terminated CString of a
+        // temp path we just created the parent of; no TOCTOU concern for a
+        // probe whose failure modes are all observable.
+        let cpath = std::ffi::CString::new(path.as_os_str().as_encoded_bytes())
+            .expect("temp path is CString-safe");
+        let rc = unsafe { libc::mkfifo(cpath.as_ptr(), 0o600) };
+        assert_eq!(rc, 0, "mkfifo probe");
+        // Open with the trust flags, bypassing the path precheck (the race
+        // window is exactly between precheck and open).
+        let file = open_checkpoint(&path, true);
+        match file {
+            Ok(f) => {
+                // Opened (nonblocking read-end succeeds); the fstat in
+                // read_checkpoint rejects it — here, assert the descriptor
+                // is NOT a regular file so the rejection would fire.
+                assert!(!f.metadata().expect("fstat probe").file_type().is_file());
+            }
+            Err(KatakuriError::CheckpointNotRegularFile { .. }) => {}
+            Err(other) => panic!("unexpected error: {other:?}"),
+        }
+        std::fs::remove_file(&path).ok();
+    }
 }

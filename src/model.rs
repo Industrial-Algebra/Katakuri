@@ -20,7 +20,7 @@
 
 use crate::error::KatakuriError;
 use crate::safetensors::Dtype;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
 /// Manifest name of the sole sanctioned non-parameter tensor (an I64
 /// buffer candle derives as an arange when it is absent).
@@ -695,29 +695,44 @@ impl MlpSpec {
     }
 
     /// The canonical JSON serialization of this spec: a deterministic,
-    /// key-sorted document with exactly the grammar fields.
+    /// fixed-key-order document with exactly the grammar fields.
     ///
     /// The bytes of this string are what `ia.schema-hash` digests (S5 §5.5),
     /// so two semantically identical specs hash identically regardless of the
     /// input document's whitespace or key order.
+    ///
+    /// Hand-rolled on purpose (review r1, P2): iterating a `serde_json::Map`
+    /// made the output depend on the map's backing — any downstream consumer
+    /// enabling serde_json's `preserve_order` feature flips it to
+    /// insertion-ordered via feature unification, silently changing
+    /// `ia.schema-hash`. This writer emits fixed keys in fixed order with no
+    /// map in sight; the format is pinned byte-for-byte by a unit test.
     #[must_use]
     pub fn canonical_json(&self) -> String {
-        let hidden: Vec<Value> = self
-            .hidden
-            .iter()
-            .map(|layer| json!({ "width": layer.width }))
-            .collect();
-        let value = json!({
-            "model_type": "ia-mlp",
-            "schema_version": 1,
-            "input_width": self.input_width,
-            "hidden": hidden,
-            "head": json!({ "width": self.head.width }),
-            "hidden_activation": self.hidden_activation.as_str(),
-        });
-        // `serde_json`'s default map is a `BTreeMap`, so key order is sorted
-        // and the serialization is deterministic.
-        value.to_string()
+        let activation = self.hidden_activation.as_str();
+        debug_assert!(
+            activation
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c == '_')
+        );
+        let mut s = String::with_capacity(96 + self.hidden.len() * 16);
+        s.push_str("{\"head\":{\"width\":");
+        s.push_str(&self.head.width.to_string());
+        s.push_str("},\"hidden\":[");
+        for (i, layer) in self.hidden.iter().enumerate() {
+            if i > 0 {
+                s.push(',');
+            }
+            s.push_str("{\"width\":");
+            s.push_str(&layer.width.to_string());
+            s.push('}');
+        }
+        s.push_str("],\"hidden_activation\":\"");
+        s.push_str(activation);
+        s.push_str("\",\"input_width\":");
+        s.push_str(&self.input_width.to_string());
+        s.push_str(",\"model_type\":\"ia-mlp\",\"schema_version\":1}");
+        s
     }
 }
 
@@ -1436,6 +1451,27 @@ mod tests {
         v["training_notes"] = json!("irrelevant");
         v["hidden"][0]["notes"] = json!("also irrelevant");
         assert!(parse_mlp(&v).is_ok());
+    }
+
+    #[test]
+    fn canonical_json_format_is_pinned_byte_for_byte() {
+        // The format is part of ia.schema-hash's definition; any change here
+        // changes every committed hash. Fixed order, compact, no whitespace —
+        // and, by construction, independent of serde_json's map backing
+        // (preserve_order feature unification cannot reach a hand-rolled
+        // writer with no map iteration).
+        let spec = MlpSpec {
+            input_width: 64,
+            hidden: vec![MlpLayerSpec { width: 256 }, MlpLayerSpec { width: 128 }],
+            head: MlpLayerSpec { width: 1 },
+            hidden_activation: Activation::GeluTanh,
+        };
+        assert_eq!(
+            spec.canonical_json(),
+            "{\"head\":{\"width\":1},\"hidden\":[{\"width\":256},{\"width\":128}],\
+             \"hidden_activation\":\"gelu_tanh\",\"input_width\":64,\
+             \"model_type\":\"ia-mlp\",\"schema_version\":1}"
+        );
     }
 
     #[test]

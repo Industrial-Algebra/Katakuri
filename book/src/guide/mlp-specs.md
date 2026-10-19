@@ -171,3 +171,23 @@ Katakuri does not compute the forward pass. The MLP's matmuls, the GELU, and
 the determinism question all live in the consuming engine — Amari's
 hand-rolled tiny matmul in 0.25.0, Borsalino's kernels later. This page
 describes weights, shapes, ordering, and trust decisions, and stops there.
+
+## Canonical form and physical layout
+
+Two independent canonicalizations keep checkpoints stable:
+
+- **`MlpSpec::canonical_json()`** — a hand-rolled, fixed-key-order document
+  (pinned byte-for-byte by a unit test). Its bytes are what `ia.schema-hash`
+  digests. It deliberately does not iterate any `serde_json` map: a
+  downstream consumer enabling `serde_json`'s `preserve_order` feature would
+  otherwise change the digest through feature unification.
+- **`ValidatedCheckpoint::canonical_data_bytes()`** — tensor data
+  concatenated in canonical parameter order (`expected_tensors()` order,
+  depth-first by layer). Loading honors the file's physical offsets and does
+  **not** require canonical arrangement; the bit-stable guarantee is over
+  this canonical concatenation, not the input bytes.
+
+The trust-policy open uses `libc`'s per-ABI `O_NOFOLLOW`/`O_NONBLOCK`
+(unix-only dependency) — hand-derived flag tables were wrong twice during
+S5's development, which is exactly the failure mode a dependency on the
+verified source eliminates.

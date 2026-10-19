@@ -10,6 +10,15 @@ keywords = ["safetensors", "tokenization", "wordpiece", "model-weights", "bert"]
 categories = ["science", "parser-implementations"]
 readme = "README.md"
 
+# ABI flag constants for the checkpoint trust policy's safe open
+# (`O_NOFOLLOW`, `O_NONBLOCK`). Hand-derived per-OS values were wrong
+# TWICE in S5 (dispatch r1 grouped all BSD-family under 0x100; the
+# in-session re-fix then used x86-64's value for every Linux arch —
+# aarch64's is 0x8000). libc is the verified per-arch source; unix-only
+# by target gating, no_std-compatible, negligible build weight.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [features]
 default = ["std"]
 std = []
