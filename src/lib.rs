@@ -41,6 +41,8 @@
 //! - [`model`] — typed BERT config + weight-layout manifests, validated
 //!   against parsed safetensors; the Ijima swap boundary (S3). Replaces
 //!   candle-transformers `models::bert`.
+//! - `digest` (optional `digest` feature) — canonical sha256 identities for
+//!   local artifacts; the hub depends on it, not the other way round (S5).
 //! - `hub` (optional `hub` feature) — model fetch + content-addressed
 //!   cache over plain HTTPS, offline-first; `hub-net` adds the ureq/rustls
 //!   transport. Replaces `hf-hub`. Lands with S4.
@@ -50,8 +52,10 @@
 //! - `std` (default): standard-library support
 //! - `verify`: karpal-verify obligation bundles for the parse invariants
 //!   (the Borsalino verification pattern, adapted to a parser crate)
+//! - `digest`: canonical sha256 artifact identities (adds `sha2`, pinned
+//!   `=0.11.0` for the 1.85 MSRV)
 //! - `hub`: model fetch + content-addressed cache, offline-first
-//!   (adds `sha2` for digest verification)
+//!   (implies `digest`; adds `sha2`)
 //! - `hub-net`: the blocking ureq/rustls HTTPS transport on top of `hub`
 //!
 //! ## Kani harnesses
@@ -85,6 +89,8 @@
 #![warn(missing_docs)]
 
 pub mod error;
+#[cfg(feature = "digest")]
+pub mod digest;
 #[cfg(feature = "hub")]
 pub mod hub;
 pub mod model;
