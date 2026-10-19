@@ -77,6 +77,13 @@ stays as-is.
 - The metadata layer (specs, manifest) builds with no `digest`, no `hub`, and
   no `checkpoint` — the W6 feature map is documented in the crate docs.
 
+### Fixed — S5 review round 2
+
+- **P2:** `libc` is now an optional unix-only dependency activated via
+  `digest` (the feature that compiles the checkpoint module) — default and
+  no-default Unix dependency graphs carry no checkpoint-only dependency
+  (verified with `cargo tree` in all four configurations; wasm32 unaffected).
+
 ## [0.1.0] — 2026-10-17
 
 Undated on purpose: `cargo publish` and the `v0.1.0` tag make it real, and the

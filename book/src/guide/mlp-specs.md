@@ -188,6 +188,8 @@ Two independent canonicalizations keep checkpoints stable:
   this canonical concatenation, not the input bytes.
 
 The trust-policy open uses `libc`'s per-ABI `O_NOFOLLOW`/`O_NONBLOCK`
-(unix-only dependency) — hand-derived flag tables were wrong twice during
-S5's development, which is exactly the failure mode a dependency on the
-verified source eliminates.
+(unix-only, and optional — activated through the `digest` feature that
+compiles the checkpoint module, so default and no-default builds carry no
+checkpoint-only dependency) — hand-derived flag tables were wrong twice
+during S5's development, which is exactly the failure mode a dependency on
+the verified source eliminates.

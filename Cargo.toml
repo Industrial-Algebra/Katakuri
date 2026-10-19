@@ -14,10 +14,12 @@ readme = "README.md"
 # (`O_NOFOLLOW`, `O_NONBLOCK`). Hand-derived per-OS values were wrong
 # TWICE in S5 (dispatch r1 grouped all BSD-family under 0x100; the
 # in-session re-fix then used x86-64's value for every Linux arch —
-# aarch64's is 0x8000). libc is the verified per-arch source; unix-only
-# by target gating, no_std-compatible, negligible build weight.
+# aarch64's is 0x8000). libc is the verified per-arch source. OPTIONAL and
+# activated only via `digest` (the feature that compiles the checkpoint
+# module) — default and no-default Unix builds carry no checkpoint-only
+# dependency (review r2, P2); wasm32 target gating keeps it out entirely.
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc = { version = "0.2", optional = true }
 
 [features]
 default = ["std"]
@@ -29,7 +31,7 @@ verify = ["dep:karpal-verify", "dep:karpal-proof"]
 # live behind `hub` — so sha256 lives here, default-off, and hub depends on it.
 # sha2 stays PINNED at exactly 0.11.0 — 0.11.1 requires Rust 1.88 and the
 # declared MSRV is 1.85 (`rust-version` above).
-digest = ["dep:sha2"]
+digest = ["dep:sha2", "dep:libc"]
 # S4 hub: content-addressed cache (sha2 only; zero-dep transport seam).
 # Depends on `digest` since S5: one sha256 implementation, re-exported.
 hub = ["dep:sha2", "digest"]
