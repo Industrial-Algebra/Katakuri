@@ -109,3 +109,39 @@ reusable across the ecosystem rather than relearning them one crate at a time
 
 The remaining weaknesses that review did **not** close are recorded in
 `docs/critique.md`.
+
+## S5 — MLP specs + validated checkpoints (PR #15)
+
+Three rounds: **2×P1 + 2×P2 → 1×P2 → converged zero.** Five root findings,
+all fixed:
+
+| # | Sev | Round | Finding | Fix |
+|---|---|---|---|---|
+| 1 | P1 | r1 | Per-ABI `O_NOFOLLOW` hand table wrong twice — dispatch grouped all BSD-family under `0x100`; the in-session re-fix spread x86-64's value to aarch64 Linux (whose flag is `0x8000`) | Table deleted; `libc` (optional, unix-only, via `digest`) owns the flags |
+| 2 | P1 | r1 | A FIFO swapped in between the metadata precheck and the open blocks the loader forever (read-end open waits for a writer) | Probe open is `O_NONBLOCK`; descriptor check rejects; hang-pinning mkfifo test |
+| 3 | P2 | r1 | `ia.schema-hash` depended on `serde_json`'s map backing — downstream `preserve_order` enablement silently changed the digest (two fixture hashes reproduced) | Hand-rolled fixed-key-order `canonical_json`, no map iteration; byte-pinned by unit test |
+| 4 | P2 | r1 | "Byte-identical round-trip" overstated — it held only for canonically-written files; reversed physical layouts loaded with no canonicalization witness | `canonical_data_bytes()` (layout-independent canonical form) + reversed-layout fixture test |
+| 5 | P2 | r2 | `libc` sat in the default and no-default Unix dependency graphs though neither compiles the checkpoint module | `libc` optional, activated by `digest`; verified via `cargo tree` in all graphs |
+
+**Classes worth reusing:**
+
+1. **Hand-copied ABI constants are a twice-failed class.** Two independent
+   hand-derivations of one flag table were both wrong, each in a different
+   way, and both passed every local gate (the targets that would catch them
+   weren't compiled). The dependency carrying the verified per-arch values is
+   cheaper than the third attempt.
+2. **Blocking syscalls are denial of service in a validator.** A trust-policy
+   loader must bound its own wait: any open that can park (FIFO read end)
+   needs the nonblocking flag even when the *expected* failure is later in
+   the pipeline.
+3. **Canonical serialization must not iterate unordered containers —
+   including ones that are "usually" ordered.** Feature unification in a
+   *downstream* crate can flip the backing map; a canonical form is a
+   protocol, and protocols do not inherit defaults.
+4. **State guarantees over the canonical form, not the input bytes.** A
+   loader that accepts arbitrary physical layout owes a named, tested
+   canonicalization — "round-trip byte-identical" without that qualifier was
+   an overstatement review correctly rejected.
+5. **A new dependency must be feature-scoped to the code that needs it.**
+   Target gating excludes platforms; only feature gating excludes
+   configurations of your own crate.

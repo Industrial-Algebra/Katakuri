@@ -41,3 +41,23 @@ Katakuri's golden test (`tests/tokenizer_golden.rs`) builds a
 tokenizer.json from the committed vocab and asserts byte-identical ids
 and masks — which simultaneously proves vocab.txt + typed defaults ≡
 tokenizer.json semantics for this model.
+
+## `tiny-mlp.safetensors`
+
+A 769-byte synthetic `ia-mlp` checkpoint exercising the full validated-load
+policy (`tests/checkpoint.rs`). Not model weights — a committed fixture with
+no third-party provenance, generated deterministically:
+
+- spec: `input_width 2`, one hidden layer of width 3, scalar head,
+  `hidden_activation: "relu"` (`ia.spec`, canonical JSON)
+- tensors, in canonical order and contiguous: `hidden.0.weight [3, 2]`,
+  `hidden.0.bias [3]`, `head.weight [1, 3]`, `head.bias [1]` — 52 bytes of
+  F32 payload
+- metadata: `ia.schema-hash` (sha256 of the spec's canonical JSON),
+  `ia.model-hash` (sha256 of the 52-byte data section), and a synthetic
+  `ia.provenance.training-data` digest
+- one bias element is a subnormal (`1e-42`), so the policy-on path proves
+  subnormals survive the nonfinite scan
+
+Regenerate only by changing the spec or values deliberately: the schema and
+model hashes are baked into the metadata, so the fixture is self-verifying.
