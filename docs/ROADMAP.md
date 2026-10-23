@@ -5,7 +5,7 @@
 > contracted; items move up only when a consumer needs them and a written
 > contract exists (the `docs/plans/` pattern).
 
-## Implemented — v0.1.0 (publication pending)
+## Implemented — v0.2.0
 
 - **S1 · safetensors** — zero-copy parse + full validation (dtype, shape,
   offsets, span arithmetic, non-overlap, 100 MB header cap), `__metadata__`
@@ -26,6 +26,13 @@
   surfaces replaced with Katakuri calls; tokenization bit-for-bit.
 - **Release polish** — CI gate matrix (test / clippy / fmt / rustdoc /
   examples / wasm32), publish-on-tag, this mdBook, roadmap and critique.
+- **S5 · MLP specs + validated checkpoints (0.2.0)** — the `ia-mlp`
+  strict feedforward family with named activations, `TensorManifest` (the
+  Borsalino T0 co-sign proposal, unstable until their session reviews),
+  the `digest` feature re-homing, and `load_validated` under an explicit
+  `TrustPolicy` (regular-file-only, byte cap, schema/model hashes, optional
+  nonfinite scan; libc-backed trust open on Unix). Three review rounds,
+  five findings, converged zero — recorded in the review record.
 
 ## Speculative
 

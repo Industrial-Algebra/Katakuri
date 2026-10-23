@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0f082cac.js";
+            window.path_to_searchindex_js = "searchindex-5ad3ddba.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-bec584ff.js"></script>
@@ -241,11 +241,14 @@ deployment class) is a first-class requirement, not a fallback. Katakuri is a
 <em>consumer</em> of Zunesha, never a wrapper: buffers flow through, and alignment
 and lifecycle obligations remain Zunesha’s.</p>
 <h2 id="status"><a class="header" href="#status">Status</a></h2>
-<p><code>0.1.0</code>: slices S1 (safetensors), S2 (tokenizer), S3 (model specs), and S4
-(hub) are complete. These are the four surfaces that replaced candle and
-<code>hf-hub</code> in Ijima’s embedding path; the tokenizer is bit-for-bit identical
-to the reference on the committed golden vectors, and the forward pass stays
-in the consumer, as designed.</p>
+<p><code>0.2.0</code>: slices S1 (safetensors), S2 (tokenizer), S3 (model specs), S4
+(hub), and S5 (MLP specs + validated checkpoints) are complete. The first
+four replaced candle and <code>hf-hub</code> in Ijima’s embedding path — the tokenizer
+bit-for-bit identical to the reference on the committed golden vectors, the
+forward pass staying in the consumer, as designed. S5 adds the Amari
+learned-rewrite seams: the <code>ia-mlp</code> architecture family, the
+<code>TensorManifest</code> layout proposal for Borsalino’s tensor extension, and
+checkpoint loading under an explicit trust policy.</p>
 
                     </main>
 

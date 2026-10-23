@@ -68,8 +68,11 @@ and lifecycle obligations remain Zunesha's.
 
 ## Status
 
-`0.1.0`: slices S1 (safetensors), S2 (tokenizer), S3 (model specs), and S4
-(hub) are complete. These are the four surfaces that replaced candle and
-`hf-hub` in Ijima's embedding path; the tokenizer is bit-for-bit identical
-to the reference on the committed golden vectors, and the forward pass stays
-in the consumer, as designed.
+`0.2.0`: slices S1 (safetensors), S2 (tokenizer), S3 (model specs), S4
+(hub), and S5 (MLP specs + validated checkpoints) are complete. The first
+four replaced candle and `hf-hub` in Ijima's embedding path — the tokenizer
+bit-for-bit identical to the reference on the committed golden vectors, the
+forward pass staying in the consumer, as designed. S5 adds the Amari
+learned-rewrite seams: the `ia-mlp` architecture family, the
+`TensorManifest` layout proposal for Borsalino's tensor extension, and
+checkpoint loading under an explicit trust policy.
