@@ -1,6 +1,6 @@
 [package]
 name = "katakuri"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Model ecosystem layer over Zunesha — safetensors weight loading, WordPiece tokenization, architecture specs, and hub access. Never computes."
@@ -10,13 +10,31 @@ keywords = ["safetensors", "tokenization", "wordpiece", "model-weights", "bert"]
 categories = ["science", "parser-implementations"]
 readme = "README.md"
 
+# ABI flag constants for the checkpoint trust policy's safe open
+# (`O_NOFOLLOW`, `O_NONBLOCK`). Hand-derived per-OS values were wrong
+# TWICE in S5 (dispatch r1 grouped all BSD-family under 0x100; the
+# in-session re-fix then used x86-64's value for every Linux arch —
+# aarch64's is 0x8000). libc is the verified per-arch source. OPTIONAL and
+# activated only via `digest` (the feature that compiles the checkpoint
+# module) — default and no-default Unix builds carry no checkpoint-only
+# dependency (review r2, P2); wasm32 target gating keeps it out entirely.
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2", optional = true }
+
 [features]
 default = ["std"]
 std = []
 # Borsalino-pattern verification obligations (karpal stack).
 verify = ["dep:karpal-verify", "dep:karpal-proof"]
+# S5 digest: canonical content hashing for local artifacts (W5). Local file
+# digests must work without the hub, and validated checkpoint loading cannot
+# live behind `hub` — so sha256 lives here, default-off, and hub depends on it.
+# sha2 stays PINNED at exactly 0.11.0 — 0.11.1 requires Rust 1.88 and the
+# declared MSRV is 1.85 (`rust-version` above).
+digest = ["dep:sha2", "dep:libc"]
 # S4 hub: content-addressed cache (sha2 only; zero-dep transport seam).
-hub = ["dep:sha2"]
+# Depends on `digest` since S5: one sha256 implementation, re-exported.
+hub = ["dep:sha2", "digest"]
 # S4 hub-net: blocking ureq/rustls transport on top of hub.
 hub-net = ["hub", "dep:ureq"]
 
@@ -34,8 +52,10 @@ karpal-proof = { version = "0.6.1", optional = true }
 # parity requires identical category tables and NFD.
 unicode-normalization = "0.1"
 unicode_categories = "0.1"
-# S4 hub: content addressing — every cache read is digest-verified.
-sha2 = { version = "0.11", optional = true }
+# S4 hub / S5 digest: content addressing — every cache read is
+# digest-verified. Pinned to exactly 0.11.0: 0.11.1 raised its MSRV to
+# Rust 1.88, above this crate's declared 1.85.
+sha2 = { version = "=0.11.0", optional = true }
 # S4 hub-net: blocking HTTPS with rustls; redirect-following; no async
 # runtime. Optional — the transport seam (Fetch trait) is dep-free.
 ureq = { version = "3.4", optional = true, default-features = false, features = ["rustls"] }
@@ -53,8 +73,11 @@ ureq = { version = "3.4", optional = true, default-features = false, features = 
 # - unicode-normalization 0.1: NFD for accent stripping (S2 tokenizer)
 # - unicode_categories 0.1: is_other/is_mark_nonspacing/is_punctuation
 #   predicates (S2 tokenizer; the reference implementation's own crate)
-# - sha2 0.11 (feature `hub`): sha256 for the content-addressed cache;
-#   every cache read is digest-verified (S4 hub)
+# - sha2 0.11.0 (features `digest` and `hub`): sha256 for local artifact
+#   identity (S5 digest: checkpoint schema/model hashes) and the
+#   content-addressed cache (S4 hub). Pinned `=0.11.0` — 0.11.1 requires
+#   Rust 1.88 and the MSRV is 1.85. Re-homed in S5 so the hub is not a
+#   prerequisite for local digests.
 # - ureq 3.4 (feature `hub-net`): blocking HTTPS transport with rustls,
 #   redirect-following, no async runtime (S4 hub-net; Fetch seam is dep-free)
 

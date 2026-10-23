@@ -61,6 +61,11 @@ use crate::error::KatakuriError;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+/// The sha256 helpers now live in [`crate::digest`] (S5) so local artifact
+/// hashing does not depend on the hub. Re-exported here: the S4 hub surface
+/// is unchanged (`sha256_hex` keeps its name and behavior).
+pub use crate::digest::{artifact_sha256, sha256_hex};
+
 /// `owner/model` identity — e.g. `sentence-transformers/all-MiniLM-L6-v2`.
 ///
 /// Strict: one or two non-empty segments; each char must be ASCII alphanumeric
@@ -465,23 +470,6 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), KatakuriError> {
     std::fs::rename(&tmp, path).map_err(|e| KatakuriError::HubCache {
         detail: format!("rename {} -> {}: {e}", tmp.display(), path.display()),
     })
-}
-
-/// Digest helper (also used by tests): lowercase hex sha256 of `bytes`.
-#[must_use]
-pub fn sha256_hex(bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    use std::fmt::Write as _;
-
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    let digest = hasher.finalize();
-    let mut out = String::with_capacity(digest.len() * 2);
-    for byte in digest.iter() {
-        // Writing to a String is infallible.
-        let _ = write!(out, "{byte:02x}");
-    }
-    out
 }
 
 /// Refuses a URL that is not HTTPS. A bearer token (or any model bytes) must

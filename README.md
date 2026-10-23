@@ -52,7 +52,8 @@ Runnable examples: `cargo run --example inspect-safetensors -- tests/fixtures/ti
 |---|---|---|---|
 | `std` | ✅ | Standard-library support | — |
 | `verify` | | karpal-verify obligation bundles for the parse invariants | `karpal-verify`, `karpal-proof` |
-| `hub` | | Model fetch + content-addressed cache (offline-first) | `sha2` |
+| `digest` | | Canonical content hashing (`sha256_hex`, `artifact_sha256`) and, with `std`, validated checkpoint loading (`load_validated` under an explicit `TrustPolicy`) | `sha2` (+ `libc` on Unix) |
+| `hub` | | Model fetch + content-addressed cache (offline-first) | `digest` + `sha2` |
 | `hub-net` | | Blocking HTTPS transport on top of `hub` | `hub` + `ureq` (rustls) |
 
 The hub adds nothing to the default dependency tree: `Fetch` is a dependency-free seam, so cache/digest/path code builds and tests without a network client. No async runtime anywhere.

@@ -1,0 +1,1564 @@
+<!DOCTYPE HTML>
+<html lang="en" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Katakuri</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Model ecosystem layer over Zunesha — weights, tokenization, specs, and hub access. Never computes.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="book/theme/custom-889b3d06.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-5ad3ddba.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-bec584ff.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Katakuri</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/Industrial-Algebra/Katakuri" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<p><strong>Katakuri</strong> is the model-ecosystem layer over
+<a href="https://github.com/Industrial-Algebra/Zunesha">Zunesha</a>: safetensors weight
+loading, BERT-class WordPiece tokenization, architecture specs as typed data,
+and hub access.</p>
+<blockquote>
+<p>The one who sees ahead — the weights are ready before the compute begins.</p>
+</blockquote>
+<h2 id="what-it-does"><a class="header" href="#what-it-does">What it does</a></h2>
+<p>Katakuri owns everything <em>around</em> tensor math:</p>
+<ul>
+<li><strong><code>safetensors</code></strong> — parse and fully validate a weight file into a
+zero-copy manifest, then hand tensor bytes either to host memory or to a
+<code>zunesha::Buffer</code> on a device.</li>
+<li><strong><code>tokenizer</code></strong> — a bespoke WordPiece engine that reproduces the reference
+tokenizer byte-for-byte on committed golden vectors.</li>
+<li><strong><code>model</code></strong> — a typed BERT <code>config.json</code> (<code>BertSpec</code>) plus weight-layout
+manifests validated against a parsed weight file.</li>
+<li><strong><code>hub</code></strong> — model-file fetch and a content-addressed, digest-verified local
+cache; offline-first, with the network transport behind its own feature.</li>
+</ul>
+<h2 id="the-hard-boundary-katakuri-never-computes"><a class="header" href="#the-hard-boundary-katakuri-never-computes">The hard boundary: Katakuri never computes</a></h2>
+<p><strong>No forward implementations. No autodiff. No kernels. No shader
+compilation.</strong></p>
+<p>Katakuri stops precisely where tensor math starts. It loads, validates, and
+describes the data consumers compute over. Consumers implement forward passes
+on their tensor engine of choice — exact CPU math today, Borsalino-class GPU
+compute later. The same weights feed either path; Katakuri takes no side.</p>
+<p>This is the structural form of the workhorse / precision doctrine:
+<strong>Borsalino is the workhorse, Amari is the precision</strong> — and Katakuri is the
+data plane both read from, so neither has to own a model loader.</p>
+<p>The boundary is enforced by the dependency ledger as much as by policy: no
+tensor framework, no BLAS, no GPU compute crate, and no async runtime appears
+anywhere in the tree.</p>
+<h2 id="why-it-exists"><a class="header" href="#why-it-exists">Why it exists</a></h2>
+<p>On 2026-10-16 <code>zip 8.6.0</code> was yanked from crates.io, making
+<code>candle-core 0.11.0</code>’s <code>zip ^8.6.0</code> requirement permanently unsatisfiable.
+Amari’s CI lost 15 of 16 workflow jobs at dependency <em>resolution</em> — before a
+single line compiled — over a candle dependency that repo never used.</p>
+<p>The strategic response was not a bespoke candle replacement. It was an
+IA-owned layer for the parts that are <em>not</em> tensor math, so the ecosystem does
+not inherit a heavy ML framework’s dependency risk for weight parsing,
+tokenization, config validation, and file fetching. That is Katakuri.</p>
+<h2 id="layering-over-zunesha"><a class="header" href="#layering-over-zunesha">Layering over Zunesha</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Crate</th><th>Role</th></tr>
+</thead>
+<tbody>
+<tr><td>Zunesha</td><td>GPU device substrate — device, queues, memory, <code>zunesha::Buffer</code></td></tr>
+<tr><td>Borsalino</td><td>GPU compute abstraction — compiles shaders, dispatches</td></tr>
+<tr><td>Goldenweek</td><td>Graphics (render) layer over Zunesha</td></tr>
+<tr><td><strong>Katakuri</strong></td><td><strong>This crate.</strong> Model ecosystem: weights, tokenization, specs, hub. Never computes.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Weight data lands in <code>zunesha::Buffer</code> when a device exists, and in host
+memory via Zunesha’s <code>NoDevice</code> path otherwise — GPU-less hardware (Ijima’s
+deployment class) is a first-class requirement, not a fallback. Katakuri is a
+<em>consumer</em> of Zunesha, never a wrapper: buffers flow through, and alignment
+and lifecycle obligations remain Zunesha’s.</p>
+<h2 id="status"><a class="header" href="#status">Status</a></h2>
+<p><code>0.2.0</code>: slices S1 (safetensors), S2 (tokenizer), S3 (model specs), S4
+(hub), and S5 (MLP specs + validated checkpoints) are complete. The first
+four replaced candle and <code>hf-hub</code> in Ijima’s embedding path — the tokenizer
+bit-for-bit identical to the reference on the committed golden vectors, the
+forward pass staying in the consumer, as designed. S5 adds the Amari
+learned-rewrite seams: the <code>ia-mlp</code> architecture family, the
+<code>TensorManifest</code> layout proposal for Borsalino’s tensor extension, and
+checkpoint loading under an explicit trust policy.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
+<h2 id="add-the-dependency"><a class="header" href="#add-the-dependency">Add the dependency</a></h2>
+<pre><code class="language-toml">[dependencies]
+katakuri = "0.1"
+</code></pre>
+<p>The default feature set is <code>std</code> only. No tensor framework, no HTTP client,
+no crypto crate: parsing, tokenization, and spec validation build and run
+offline on GPU-less hardware. Network fetch is opt-in (<code>hub-net</code>) — see
+<a href="#feature-flags">Feature Flags</a>.</p>
+<p>For a local checkout:</p>
+<pre><code class="language-toml">[dependencies]
+katakuri = { path = "../Katakuri" }
+</code></pre>
+<h2 id="first-code-encode-text"><a class="header" href="#first-code-encode-text">First code: encode text</a></h2>
+<p>The tokenizer needs only a vocab. This is the real
+<code>sentence-transformers/all-MiniLM-L6-v2</code> vocabulary, but any BERT-class
+line-per-token <code>vocab.txt</code> works — line <em>i</em> is token id <em>i</em>.</p>
+<pre class="playground"><code class="language-rust">use katakuri::tokenizer::Tokenizer;
+
+fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    let vocab = std::fs::read("vocab.txt")?;
+    let tokenizer = Tokenizer::from_bert_vocab_txt(&amp;vocab)?;
+
+    let encoding = tokenizer.encode("Katakuri never computes.", true);
+    println!("ids:  {:?}", encoding.ids);
+    println!("mask: {:?}", encoding.attention_mask);
+    Ok(())
+}</code></pre>
+<p>Against the MiniLM vocab this prints:</p>
+<pre><code class="language-text">ids:  [101, 29354, 18569, 2072, 2196, 24134, 2015, 1012, 102]
+mask: [1, 1, 1, 1, 1, 1, 1, 1, 1]
+</code></pre>
+<p><code>encode</code> never pads and never fails: unknown pieces become <code>[UNK]</code> by design.
+Use <code>encode_batch</code> when you want BatchLongest right-padding (that is the only
+place padding is observable).</p>
+<p>From a <code>tokenizer.json</code> instead of a bare vocab:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::tokenizer::Tokenizer;
+
+let json = std::fs::read("tokenizer.json")?;
+let tokenizer = Tokenizer::from_tokenizer_json(&amp;json)?;
+<span class="boring">}</span></code></pre>
+<p>Only the BERT-class subset is accepted (<code>BertNormalizer</code>, <code>BertPreTokenizer</code>,
+<code>TemplateProcessing</code> with <code>[CLS] A [SEP]</code>, <code>WordPiece</code>, <code>LongestFirst</code>
+truncation). Anything else rejects with a typed error rather than silently
+diverging from a configuration Katakuri does not implement.</p>
+<h2 id="next-read-weights"><a class="header" href="#next-read-weights">Next: read weights</a></h2>
+<p>The rest of this page shows fragments; they assume the surrounding function is
+<code>fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt;</code>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::safetensors::SafeTensors;
+
+let bytes = std::fs::read("model.safetensors")?;
+let weights = SafeTensors::parse(&amp;bytes)?;
+
+println!("{} tensors", weights.tensor_count());
+for name in weights.names() {
+    let tensor = weights.tensor(name)?;
+    println!("{name}: {:?} {:?}", tensor.dtype(), tensor.shape());
+}
+<span class="boring">}</span></code></pre>
+<p>Parsing validates the whole manifest up front: dtype, shape, offsets, span
+arithmetic, and non-overlap. A file that parses is a file whose every tensor
+can be sliced safely.</p>
+<h2 id="next-validate-a-model-end-to-end"><a class="header" href="#next-validate-a-model-end-to-end">Next: validate a model end to end</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::model::BertSpec;
+
+let spec = BertSpec::from_config_json(&amp;std::fs::read_to_string("config.json")?)?;
+spec.validate_weights(&amp;weights)?;          // names, dtypes, shapes, completeness
+spec.check_tokenizer_compatibility(&amp;tokenizer)?; // ids fit the embedding table
+<span class="boring">}</span></code></pre>
+<h2 id="runnable-examples"><a class="header" href="#runnable-examples">Runnable examples</a></h2>
+<p>The repository ships three, each runnable against a checkout:</p>
+<pre><code class="language-sh">cargo run --example inspect-safetensors -- tests/fixtures/tiny-model.safetensors
+cargo run --example encode-text
+cargo run --example fetch-and-validate --features hub-net   # first run downloads ~90 MB
+cargo run --example fetch-and-validate --features hub-net -- --offline
+</code></pre>
+<p><code>fetch-and-validate</code> fetches <code>all-MiniLM-L6-v2</code> through the hub, parses the
+config into a <code>BertSpec</code>, validates the real 90 MB weight file against the
+derived layout, and cross-checks tokenizer/embedding capacity. <code>--offline</code>
+accepts cache hits only and never touches the network.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="concepts--doctrine"><a class="header" href="#concepts--doctrine">Concepts &amp; Doctrine</a></h1>
+<p>Four ideas explain every design decision in this crate.</p>
+<h2 id="1-the-never-computes-boundary"><a class="header" href="#1-the-never-computes-boundary">1. The never-computes boundary</a></h2>
+<p>Katakuri loads, validates, and describes. It never computes.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Katakuri does</th><th>Katakuri does not</th></tr>
+</thead>
+<tbody>
+<tr><td>Parse and validate a safetensors manifest</td><td>Forward passes</td></tr>
+<tr><td>Hand tensor bytes to host memory or <code>zunesha::Buffer</code></td><td>Autodiff, gradients, optimizers</td></tr>
+<tr><td>Tokenize text into ids</td><td>Kernels, shaders, dispatch</td></tr>
+<tr><td>Validate a config + weight layout against each other</td><td>Numeric weight inspection</td></tr>
+</tbody>
+</table>
+</div>
+<p>The boundary is not modesty; it is the point. A model loader that also
+contains a compute graph drags in a tensor framework, and a tensor framework
+drags in a dependency tree nobody in the IA ecosystem audited — which is
+exactly the failure that created this repo. Consumers implement the forward
+pass on the engine they already trust:</p>
+<pre><code class="language-text">Katakuri:  config.json → BertSpec
+           model.safetensors → validated manifest
+           tokenizer.json → Tokenizer
+              ↓  (typed data: ids, shapes, names, dtypes, byte views)
+Consumer:  forward pass on exact CPU math (Amari-style) or Borsalino GPU
+</code></pre>
+<p>Because <code>upload_to_device</code> produces a <code>zunesha::Buffer</code> while the host view
+stays valid, the same weights feed either path with no re-loading and no
+conversion step. Katakuri takes no side in the workhorse/precision split.</p>
+<h2 id="2-strict-construction-typed-rejection-over-silent-divergence"><a class="header" href="#2-strict-construction-typed-rejection-over-silent-divergence">2. Strict construction: typed rejection over silent divergence</a></h2>
+<p>Wherever an input format is bigger than the subset Katakuri implements, the
+implemented subset is <strong>strict</strong> and everything outside it is a typed error —
+never a best-effort interpretation.</p>
+<p>The rule matters most for parity surfaces. A tokenizer that silently
+approximates <code>BertNormalizer</code> produces embeddings that are <em>almost</em> right,
+which is worse than an error, because nothing downstream can tell. So:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Input</th><th>Outside the subset</th><th>Result</th></tr>
+</thead>
+<tbody>
+<tr><td><code>tokenizer.json</code> model</td><td>anything but <code>WordPiece</code></td><td><code>UnsupportedModel</code></td></tr>
+<tr><td>normalizer</td><td>anything but <code>BertNormalizer</code></td><td><code>UnsupportedNormalizer</code></td></tr>
+<tr><td>pre-tokenizer</td><td>anything but <code>BertPreTokenizer</code></td><td><code>UnsupportedPreTokenizer</code></td></tr>
+<tr><td>post-processor</td><td>templates other than <code>[CLS] A [SEP]</code></td><td><code>UnsupportedPostProcessor</code></td></tr>
+<tr><td>truncation strategy</td><td>anything but <code>LongestFirst</code></td><td><code>UnsupportedTruncationStrategy</code></td></tr>
+<tr><td>truncation direction</td><td>anything but <code>Right</code></td><td><code>UnsupportedTruncationDirection</code></td></tr>
+<tr><td>added-token flags</td><td><code>single_word</code> / <code>lstrip</code> / <code>rstrip</code></td><td><code>InvalidTokenizerJson</code></td></tr>
+<tr><td><code>config.json</code> <code>hidden_act</code></td><td>anything but gelu / gelu_approximate / relu</td><td><code>InvalidConfigJson</code></td></tr>
+<tr><td><code>config.json</code> <code>model_type</code></td><td>anything but <code>"bert"</code></td><td><code>InvalidConfigJson</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The same doctrine governs geometry. <code>BertSpec</code> rejects non-positive or
+<code>u32</code>-overflowing size fields, a <code>hidden_size</code> not divisible by
+<code>num_attention_heads</code>, a non-finite or non-positive <code>layer_norm_eps</code>, and an
+impractical <code>num_hidden_layers &gt; 1024</code> (the last one exists because
+<code>5 + 16L + 2</code> overflows a 32-bit <code>usize</code> and would panic on wasm32 —
+strict construction rejects it at parse time instead).</p>
+<p>Validation is also <strong>diagnostics-first</strong>: <code>validate_weights</code> collects <em>every</em>
+divergence (missing, unexpected, wrong shape, wrong dtype) into one error
+rather than reporting the first. One round trip tells you everything wrong
+with a weight set.</p>
+<h2 id="3-golden-parity-methodology"><a class="header" href="#3-golden-parity-methodology">3. Golden-parity methodology</a></h2>
+<p>Parity claims are cheap; parity evidence is not. The tokenizer is verified
+against the reference implementation, not against a reading of its source:</p>
+<ol>
+<li><strong>Generate goldens with the reference.</strong> 26 single-sequence cases plus 3
+batch cases were produced by the real HF Rust <code>tokenizers</code> crate
+(0.21.4 — the exact crate and version Ijima pinned), using Ijima’s exact
+call shape (<code>BatchLongest</code> padding, <code>encode(text, add_special_tokens = true)</code>).</li>
+<li><strong>Commit the goldens and the vocab.</strong> <code>tests/fixtures/golden_minilm.json</code>
+and <code>tests/fixtures/minilm-vocab.txt</code> live in the repo, so CI replays
+parity with <strong>no network and no model download</strong>.</li>
+<li><strong>Pin the corpus to the hard cases.</strong> Case folding, NFD accent stripping,
+punctuation isolation, subword segmentation, CJK per-character handling,
+emoji → <code>[UNK]</code>, literal <code>[SEP]</code>/<code>[CLS]</code> in raw text, <code>##</code> literals,
+empty/whitespace inputs, and an over-length input truncating to exactly 128
+tokens ending in <code>[SEP]</code>.</li>
+<li><strong>Assert ids and masks byte-for-byte.</strong> The committed goldens <em>are</em> the
+contract; regenerating them is only legitimate when the corpus changes.</li>
+</ol>
+<p>A useful side effect: the test builds a tokenizer from the plain vocab with
+typed defaults and asserts it matches the goldens. That proves
+<code>vocab.txt</code> + BERT defaults ≡ <code>tokenizer.json</code> semantics for this model, so
+both constructors are exercised against the same evidence.</p>
+<h2 id="4-content-addressed-cache-digest-on-read"><a class="header" href="#4-content-addressed-cache-digest-on-read">4. Content-addressed cache, digest on read</a></h2>
+<p>The hub’s cache is trustworthy only as far as its digests. Every read
+re-hashes:</p>
+<pre><code class="language-text">{root}/{owner}~{model}/{revision}/content/{filename}    ← bytes
+{root}/{owner}~{model}/{revision}/digests/{filename}    ← lowercase-hex sha256 + "\n"
+</code></pre>
+<ul>
+<li>A path returned by <code>Hub::get</code> held bytes whose sha256 matched the sidecar
+<strong>at return time</strong>.</li>
+<li>Every later <code>Hub::cached</code> hit re-reads the file, re-hashes it, and compares.
+A tampered or truncated entry reads as a <strong>miss</strong>, not as data; under
+<code>CacheFirst</code> it is refetched and atomically overwritten.</li>
+<li>Writes are atomic: full write to a same-directory temp file, then <code>rename</code>.
+No reader ever sees a partial file, and a crashed write cannot leave a
+half-written entry that later verifies.</li>
+</ul>
+<p>Three structural choices make the cache safe rather than merely correct:</p>
+<ol>
+<li><strong>Namespace separation.</strong> Content, digest sidecars, and temporary files
+occupy separate directories, and a sidecar is named <em>exactly</em> the filename.
+A fetched file can therefore never be mistaken for a sidecar — even a file
+literally named <code>x.sha256</code> lands under <code>content/</code>.</li>
+<li><strong>Case-safe encoding.</strong> Every case-bearing component is encoded
+(uppercase <code>X</code> → <code>^</code> + lowercase <code>x</code>); <code>^</code> is outside the segment grammar,
+so encoded names contain no uppercase and cannot alias on a
+case-insensitive filesystem. Revision <code>V1</code> and <code>v1</code> are different cache
+entries on macOS and Windows too.</li>
+<li><strong>Strict path grammar.</strong> Owner, model, revision, and filename are single
+segments of ASCII alphanumerics plus <code>-._</code>. <code>..</code>, <code>/</code>, NUL, and everything
+else reject at construction, so a hostile repo id cannot escape the cache
+root.</li>
+</ol>
+<p>The cache is <strong>revision-keyed</strong>, not commit-keyed: the revision string is used
+exactly as given. <code>main</code> re-resolves and can name different bytes over time;
+pin a commit sha when you need immutability. The known limitations (no file
+locking, Windows reserved device names, revision-string keying) are recorded
+in <a href="#known-limitations">The Hub</a> — recorded, not hidden.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h1>
+<p>Katakuri is additive-feature-gated. The default build is the offline core —
+weights, tokenization, specs — and every network or verification surface is
+opt-in.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Feature</th><th>Default</th><th>Enables</th><th>Pulls in</th></tr>
+</thead>
+<tbody>
+<tr><td><code>std</code></td><td>✅</td><td>Standard-library support (file I/O for <code>checkpoint</code>)</td><td>—</td></tr>
+<tr><td><code>verify</code></td><td></td><td>karpal-verify obligation bundles for the parse invariants</td><td><code>karpal-verify</code>, <code>karpal-proof</code></td></tr>
+<tr><td><code>digest</code></td><td></td><td>Canonical sha256 artifact identities (<code>artifact_sha256</code>)</td><td><code>sha2</code> (pinned <code>=0.11.0</code>)</td></tr>
+<tr><td><code>hub</code></td><td></td><td>Model fetch + content-addressed cache (offline-first), <code>Fetch</code> seam</td><td><code>digest</code> + <code>sha2</code></td></tr>
+<tr><td><code>hub-net</code></td><td></td><td>Blocking HTTPS transport (<code>UreqFetcher</code>) on top of <code>hub</code></td><td><code>hub</code> + <code>ureq</code> (rustls)</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>checkpoint</code> is a surface, not a feature name: it requires <code>std</code> <strong>and</strong>
+<code>digest</code> (file I/O plus hash verification). The metadata layer — specs and the
+layout manifest — needs neither.</p>
+<p><code>default = ["std"]</code>.</p>
+<h2 id="the-zero-dependency-default-for-the-hub-surface"><a class="header" href="#the-zero-dependency-default-for-the-hub-surface">The zero-dependency default (for the hub surface)</a></h2>
+<p>The base crate depends on five small crates — <code>thiserror</code>, <code>serde_json</code>,
+<code>zunesha</code>, and the two Unicode tables the reference tokenizer itself uses.
+The hub adds <strong>nothing</strong> to that: the <code>Fetch</code> trait is a dependency-free seam,
+so the cache, path validation, and digest machinery build and test with no
+network client at all. <code>sha2</code> arrives only with <code>digest</code> (and <code>hub</code>, which
+depends on it — one hash implementation, re-exported rather than duplicated),
+and <code>ureq</code> only with <code>hub-net</code>. There is no async runtime anywhere.</p>
+<p><code>sha2</code> is pinned to exactly <code>0.11.0</code>: <code>0.11.1</code> raised its MSRV to Rust 1.88,
+above this crate’s declared 1.85.</p>
+<h2 id="combinations"><a class="header" href="#combinations">Combinations</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Goal</th><th>Features</th><th>Command</th></tr>
+</thead>
+<tbody>
+<tr><td>Parse weights, tokenize, validate specs — no hashing, no file I/O</td><td>(none)</td><td><code>cargo build</code></td></tr>
+<tr><td>The above + karpal obligation bundles</td><td><code>verify</code></td><td><code>cargo build --features verify</code></td></tr>
+<tr><td>Local artifact digests + validated checkpoint loading</td><td><code>digest</code></td><td><code>cargo build --features digest</code></td></tr>
+<tr><td>Cache + custom transport (embed a non-ureq client)</td><td><code>hub</code></td><td><code>cargo build --features hub</code></td></tr>
+<tr><td>Cache + batteries-included HTTPS</td><td><code>hub-net</code></td><td><code>cargo build --features hub-net</code></td></tr>
+<tr><td>Everything</td><td>all</td><td><code>cargo build --all-features</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><code>hub-net</code> implies <code>hub</code>, which implies <code>digest</code>; you never enable them by
+hand. There is no hub-on-digest-off configuration — the crate asserts that in
+a doctest and a <code>compile_error!</code>.</p>
+<h2 id="what-each-gate-buys"><a class="header" href="#what-each-gate-buys">What each gate buys</a></h2>
+<ul>
+<li><strong><code>verify</code></strong> — three <code>ObligationBundle</code>s (<code>IsOffsetInBounds</code>,
+<code>IsSpanConsistent</code>, <code>IsManifestNonOverlapping</code>) exported for the karpal
+SMT/Lean/Kani backends, tier <code>Impossible</code>: the validator makes the illegal
+state unrepresentable. See <a href="#verification">Verification</a>.</li>
+<li><strong><code>digest</code></strong> — <code>katakuri::digest</code>: <code>artifact_sha256</code> (and the S4-compatible
+<code>sha256_hex</code> alias). Local artifact identity for checkpoint metadata
+(<code>ia.schema-hash</code>, <code>ia.model-hash</code>) without pulling in the hub.</li>
+<li><strong><code>checkpoint</code></strong> (<code>std</code> + <code>digest</code>) — <code>katakuri::checkpoint</code>:
+<code>load_validated</code>, <code>TrustPolicy</code>, <code>ValidatedCheckpoint</code>. The ordered trust
+pipeline; see <a href="#mlp-specs--validated-checkpoints">MLP Specs &amp; Validated Checkpoints</a>.</li>
+<li><strong><code>hub</code></strong> — <code>katakuri::hub</code>: <code>RepoId</code>, <code>Revision</code>, <code>Hub</code>, <code>Policy</code>, the
+<code>Fetch</code> trait, and the re-exported <code>sha256_hex</code>. Offline-first: with a warm
+cache, no network code path is reachable.</li>
+<li><strong><code>hub-net</code></strong> — <code>UreqFetcher</code> (blocking, rustls, HTTPS-only including the
+redirect chain, optional bearer token). The only surface in this crate that
+opens a socket.</li>
+</ul>
+<h2 id="ci-matrix"><a class="header" href="#ci-matrix">CI matrix</a></h2>
+<p>Every gate is exercised in both configurations, plus a wasm32 check:</p>
+<pre><code class="language-sh">cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --features hub-net
+cargo test --features digest
+cargo check --target wasm32-unknown-unknown --features hub
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="the-hub-fetch--cache"><a class="header" href="#the-hub-fetch--cache">The Hub: Fetch &amp; Cache</a></h1>
+<p><code>katakuri::hub</code> (feature <code>hub</code>) replaces <code>hf-hub</code> as the model-file
+acquisition path: a revision-keyed, digest-verified local cache with a
+pluggable transport seam. <code>hub-net</code> adds the blocking ureq/rustls transport.</p>
+<h2 id="resolving-a-file"><a class="header" href="#resolving-a-file">Resolving a file</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::hub::{Hub, RepoId, Revision, UreqFetcher};
+use std::sync::Arc;
+
+let repo = RepoId::parse("sentence-transformers/all-MiniLM-L6-v2")?;
+let rev = Revision::main();
+let hub = Hub::with_default_root(Arc::new(UreqFetcher::new()))?;
+
+let config_path = hub.get(&amp;repo, &amp;rev, "config.json")?;
+let config = std::fs::read_to_string(config_path)?;
+<span class="boring">}</span></code></pre>
+<p><code>get</code> resolves a digest-verified cache hit, or fetches, verifies, writes
+atomically, and returns the <strong>local path</strong> — never a URL. The URL used is the
+Hub <code>resolve</code> form (<code>https://huggingface.co/{repo}/resolve/{rev}/{filename}</code>).</p>
+<h2 id="policies"><a class="header" href="#policies">Policies</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::hub::Policy;
+
+// CacheFirst (default): verified hit short-circuits; miss or corrupt fetches.
+let path = hub.get_with(&amp;repo, &amp;rev, "config.json", Policy::CacheFirst)?;
+
+// AlwaysFetch: re-fetch even on a hit, verify, atomically overwrite.
+let path = hub.get_with(&amp;repo, &amp;rev, "config.json", Policy::AlwaysFetch)?;
+<span class="boring">}</span></code></pre>
+<p>Offline lookups are a separate, infallible call:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if let Some(path) = hub.cached(&amp;repo, &amp;rev, "config.json") {
+    // digest-verified hit — no network, no error path
+}
+<span class="boring">}</span></code></pre>
+<p><code>cached</code> returns <code>None</code> on a miss, a corrupt entry, or an unreadable one. It
+never fetches and never errors, which is what makes the offline-first story
+testable: warm the cache, then swap in a transport that panics if touched.</p>
+<h2 id="cache-root"><a class="header" href="#cache-root">Cache root</a></h2>
+<p><code>$KATAKURI_HUB_DIR</code>, else <code>$HOME/.cache/katakuri/hub</code>. Override per-process:</p>
+<pre><code class="language-sh">KATAKURI_HUB_DIR=/var/cache/katakuri cargo run --example fetch-and-validate --features hub-net
+</code></pre>
+<p>Layout — content, digests, and temp files never share a namespace:</p>
+<pre><code class="language-text">{root}/{owner}~{model}/{revision}/content/{filename}
+{root}/{owner}~{model}/{revision}/digests/{filename}
+</code></pre>
+<p>The sidecar holds the lowercase-hex sha256 plus a trailing newline and is
+named exactly the filename. A fetched file therefore cannot shadow a sidecar,
+whatever it is called.</p>
+<h2 id="tokens"><a class="header" href="#tokens">Tokens</a></h2>
+<p><code>UreqFetcher::new()</code> is unauthenticated (public repos; the Hub’s anonymous
+rate limit is roughly 3000 requests / 5 minutes). For gated repos or higher
+limits:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::hub::UreqFetcher;
+
+let fetcher = match std::env::var("HF_TOKEN") {
+    Ok(token) if !token.is_empty() =&gt; UreqFetcher::with_token(token),
+    _ =&gt; UreqFetcher::new(),
+};
+<span class="boring">}</span></code></pre>
+<p>The token is sent as <code>Authorization: Bearer …</code> and is <strong>never</strong> rendered by
+<code>Debug</code> (<code>UreqFetcher</code> prints <code>Some(&lt;redacted&gt;)</code>).</p>
+<h2 id="security-notes"><a class="header" href="#security-notes">Security notes</a></h2>
+<ul>
+<li><strong>HTTPS only, end to end.</strong> The initial URL is checked, and the ureq agent
+is built with <code>https_only(true)</code>, so an <code>https → http</code> redirect downgrade in
+the middle of the Hub’s 307 chain refuses to connect rather than leaking the
+bearer or accepting plaintext bytes. (This was review finding 20: the
+initial-scheme check alone did not cover redirects.)</li>
+<li><strong>Digest on read.</strong> A path is only returned after its bytes hashed to the
+sidecar digest, and every subsequent <code>cached</code> hit re-hashes. Tampering reads
+as a miss and triggers a refetch.</li>
+<li><strong>Strict path grammar.</strong> Owner, model, revision, and filename are single
+segments of ASCII alphanumerics plus <code>-._</code>; <code>..</code>, <code>/</code>, NUL and everything
+else reject with <code>UnsafeRepoPath</code> before any path is built. Path traversal
+is unrepresentable, not filtered.</li>
+<li><strong>Case-safe encoding.</strong> Uppercase becomes <code>^</code> + lowercase in every
+case-bearing component, so <code>V1</code>/<code>v1</code> and <code>Config.json</code>/<code>config.json</code> cannot
+alias on a case-insensitive filesystem.</li>
+<li><strong>Body ceiling.</strong> 1 GiB (<code>MAX_BODY_BYTES</code>), read with one byte of headroom
+so an over-limit body is rejected rather than silently truncated.</li>
+<li><strong>Strict final status.</strong> Only HTTP 200 after redirects is accepted; a 204 or
+304 is a failed fetch, never empty content to be cached.</li>
+</ul>
+<h2 id="known-limitations"><a class="header" href="#known-limitations">Known limitations</a></h2>
+<p>Recorded, not hidden:</p>
+<ul>
+<li><strong>No file locking.</strong> Concurrent writers to the same cache entry are not
+serialized; the atomic rename keeps readers from seeing partial content, but
+two processes may both fetch. Fine for the single-process deployments this
+targets; revisit if a multi-process daemon shares a cache root.</li>
+<li><strong>Revision-string keying.</strong> The cache key includes the revision exactly as
+given. A branch or tag (<code>main</code>) re-resolves and can name different bytes over
+time. Pin a commit sha for reproducibility. S4 performs no header-based
+(e.g. <code>x-repo-commit</code>) pinning; that is deferred.</li>
+<li><strong>Windows reserved device names are open.</strong> The segment grammar admits <code>con</code>,
+<code>nul</code>, <code>aux</code> and friends; those become problematic only if such a character
+device is actually opened on Windows. Not yet rejected.</li>
+<li><strong>No metadata API.</strong> No model listing, siblings, or uploads — file fetch
+only. No xet/LFS protocol implementation: the plain <code>resolve</code> URL with
+redirect-following covers the observed behavior.</li>
+</ul>
+<h2 id="replacing-the-transport"><a class="header" href="#replacing-the-transport">Replacing the transport</a></h2>
+<p><code>Fetch</code> is the whole transport contract — one method, no dependencies:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::KatakuriError;
+use katakuri::hub::Fetch;
+
+#[derive(Debug)]
+struct Fake {
+    body: Vec&lt;u8&gt;,
+}
+
+impl Fetch for Fake {
+    fn fetch(&amp;self, _url: &amp;str) -&gt; Result&lt;Vec&lt;u8&gt;, KatakuriError&gt; {
+        Ok(self.body.clone())
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>That is how the hub’s tests run hermetically, and how an embedder plugs in an
+existing HTTP client instead of <code>ureq</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="mlp-specs--validated-checkpoints"><a class="header" href="#mlp-specs--validated-checkpoints">MLP Specs &amp; Validated Checkpoints</a></h1>
+<p>Katakuri 0.2.0 adds a second architecture family — the <code>ia-mlp</code> feedforward
+spec — and the validated checkpoint loader Amari’s learned rewrite needs
+(Amari 0.25.0 Tasks 40–45, wishlist W1 + W2 + W5). They land together because
+they are coupled: the loader’s shape/schema check and its canonical parameter
+order both come from the spec.</p>
+<h2 id="mlpspec--the-ia-mlp-family"><a class="header" href="#mlpspec--the-ia-mlp-family"><code>MlpSpec</code> — the <code>ia-mlp</code> family</a></h2>
+<p><code>BertSpec</code> and <code>MlpSpec</code> are <strong>separate families sharing invariants</strong>, not one
+generalized config parser. A BERT-shaped model still rejects under <code>MlpSpec</code>,
+and an MLP rejects under <code>BertSpec</code> — each error names the families it knows
+(<code>"bert"</code> / <code>"ia-mlp"</code>) so a caller can route.</p>
+<pre><code class="language-json">{
+  "model_type": "ia-mlp",
+  "schema_version": 1,
+  "input_width": 64,
+  "hidden": [{"width": 256}],
+  "head": {"width": 1},
+  "hidden_activation": "gelu_erf"
+}
+</code></pre>
+<p>Strict grammar, parsed by <code>MlpSpec::from_json</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Rule</th></tr>
+</thead>
+<tbody>
+<tr><td><code>model_type</code></td><td>required, exactly <code>"ia-mlp"</code></td></tr>
+<tr><td><code>schema_version</code></td><td>required, exactly <code>1</code> (forward-compat gate)</td></tr>
+<tr><td><code>input_width</code></td><td>required, <code>1..=4096</code></td></tr>
+<tr><td><code>hidden</code></td><td>required array, length <code>0..=8</code>; each <code>{"width": w}</code>, <code>1..=16384</code></td></tr>
+<tr><td><code>head</code></td><td>required, <code>{"width": 1}</code> — the head produces a scalar score</td></tr>
+<tr><td><code>hidden_activation</code></td><td>required: <code>relu</code>, <code>tanh</code>, <code>gelu_erf</code>, <code>gelu_tanh</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Every bound is checked with plain comparisons — no <code>+1</code>, no subtraction, no
+multiplication at parse time — so the checks cannot wrap on a 32-bit target
+(the wasm32 lesson from S3, re-applied). The largest derived weight is
+<code>16384 × 16384 = 268_435_456</code> elements, which fits a 32-bit <code>usize</code>;
+<code>cargo check --target wasm32-unknown-unknown</code> keeps that true.</p>
+<p>Unrecognized keys inside the spec are tolerated and ignored (the S3
+discipline: the consumed surface is strict, training metadata is not ours).
+The <em>checkpoint metadata</em> namespace is where unknown keys reject — see below.</p>
+<h3 id="canonical-parameter-order"><a class="header" href="#canonical-parameter-order">Canonical parameter order</a></h3>
+<p><code>expected_tensors()</code> returns names and shapes <strong>depth-first, layer order</strong>:</p>
+<pre><code class="language-text">hidden.0.weight  [w0, input]
+hidden.0.bias    [w0]
+hidden.1.weight  [w1, w0]
+hidden.1.bias    [w1]
+…
+head.weight      [1, w_last]
+head.bias        [1]
+</code></pre>
+<p>That order <em>is</em> the canonical ordering the checkpoint round-trip guarantee
+relies on — it is not an implementation detail.</p>
+<h3 id="activations-are-named-semantics-not-code"><a class="header" href="#activations-are-named-semantics-not-code">Activations are named semantics, not code</a></h3>
+<p><code>Activation</code> names the function; Katakuri never evaluates it:</p>
+<ul>
+<li><code>Relu</code> — <code>max(0, x)</code></li>
+<li><code>Tanh</code></li>
+<li><code>GeluErf</code> — exact <code>0.5x(1+erf(x/√2))</code>; erf is the consumer’s</li>
+<li><code>GeluTanh</code> — candle’s <code>GeluApproximate</code> semantics (the exact function
+Ijima pinned), now a <em>named</em> choice instead of an inherited backend detail</li>
+</ul>
+<h2 id="load_validated--the-trust-policy"><a class="header" href="#load_validated--the-trust-policy"><code>load_validated</code> — the trust policy</a></h2>
+<p>0.1.0’s <code>SafeTensors::parse</code> takes <code>&amp;[u8]</code> and is value-blind. The checkpoint
+module is the scoped, named reversal: it opens a file, applies an explicit
+<code>TrustPolicy</code>, parses through S1 unchanged, and optionally scans values.
+<code>parse</code> itself stays value-blind.</p>
+<p>Every policy field is an explicit choice — nothing is silently on:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::checkpoint::{TrustPolicy, load_validated};
+
+let policy = TrustPolicy {
+    regular_file_only: true,   // symlinks/FIFOs/devices/dirs reject; hardlinks pass
+    byte_cap: 64 &lt;&lt; 20,        // checked before reading, read bounded by the same cap
+    verify_schema_hash: true,  // ia.schema-hash vs the parsed spec's canonical JSON
+    verify_model_hash: true,   // ia.model-hash vs the data section
+    reject_nonfinite: true,    // NaN / ±Inf in F32 tensors reject
+};
+
+match load_validated(std::path::Path::new("model.safetensors"), &amp;policy) {
+    Ok(checkpoint) =&gt; {
+        // spec, manifest, metadata, and tensors in canonical order
+        let _ = checkpoint.spec.input_width;
+    }
+    Err(error) =&gt; eprintln!("checkpoint rejected: {error}"),
+}
+<span class="boring">}</span></code></pre>
+<p>The pipeline is ordered and failure is total (no partial loads):</p>
+<ol>
+<li>regular-file check (<code>symlink_metadata</code> + <code>O_NOFOLLOW</code> on Unix + <code>fstat</code> on
+the opened descriptor; plain metadata elsewhere)</li>
+<li>byte cap</li>
+<li>read</li>
+<li>S1 parse (value-blind)</li>
+<li>metadata convention (<code>ia.*</code>)</li>
+<li><code>ia.spec</code> → <code>MlpSpec</code> (strict)</li>
+<li>shape/schema agreement with <code>expected_tensors()</code> (diagnostics-first)</li>
+<li>schema/model hash verification — <strong>before</strong> the value scan, so a tampered
+file reports a hash mismatch rather than a value diagnostic</li>
+<li>optional nonfinite scan</li>
+<li>manifest assembly in canonical order</li>
+</ol>
+<p>Hardlinks are regular files and are accepted. Subnormals are finite and are
+<strong>kept</strong>: they are legal f32 values, and whether the compute layer tolerates
+them is its question, not the loader’s. A failed load returns no partial
+result — <code>ValidatedCheckpoint</code> exists only when every enabled check passed.</p>
+<h2 id="the-metadata-convention-ia"><a class="header" href="#the-metadata-convention-ia">The metadata convention (<code>ia.*</code>)</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Key</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ia.spec</code></td><td>the spec JSON itself (required)</td></tr>
+<tr><td><code>ia.schema-hash</code></td><td>sha256 of the parsed spec’s canonical JSON</td></tr>
+<tr><td><code>ia.model-hash</code></td><td>sha256 of the safetensors data section</td></tr>
+<tr><td><code>ia.provenance.training-data</code></td><td>free-form replay/training-data binding, <code>1..=4096</code> bytes</td></tr>
+</tbody>
+</table>
+</div>
+<p>Any other <code>ia.*</code> key <strong>rejects</strong> (<code>UnknownIaMetadata</code>): the namespace is
+strict, and forward compatibility is a <code>schema_version</code> bump, not a silent
+ignore. Metadata outside the <code>ia.</code> namespace is the writer’s business and is
+carried through untouched.</p>
+<p><code>MlpSpec::canonical_json()</code> is the deterministic, key-sorted serialization the
+schema hash covers, so semantically identical specs hash identically
+regardless of input whitespace or key order.</p>
+<h2 id="the-layout-manifest-t0-co-sign-unstable"><a class="header" href="#the-layout-manifest-t0-co-sign-unstable">The layout manifest (T0 co-sign, unstable)</a></h2>
+<p><code>TensorManifest</code> is the shared Katakuri ⇄ <code>borsalino-tensor</code> contract
+(Borsalino PR #61 §4.4): canonical order, F32 pinned, row-major contiguous, no
+padding, plus the determinism metadata the compute layer needs (no
+bit-pattern-changing fast paths — wishlist W3’s Katakuri side).</p>
+<p>It is <strong>data, not buffers</strong>: no <code>zunesha</code> dependency, and binding entries to
+device buffers is the consumer’s concern. The type is <strong>not frozen</strong> in 0.2.0
+— it freezes only after the Borsalino tensor-extension session reviews it
+against T0’s zero-copy needs. That gate is named in the module docs.</p>
+<h2 id="feature-gates"><a class="header" href="#feature-gates">Feature gates</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Surface</th><th>Requires</th></tr>
+</thead>
+<tbody>
+<tr><td><code>MlpSpec</code>, <code>Activation</code>, <code>TensorManifest</code> (metadata layer)</td><td>nothing — pure data, no <code>sha2</code>, no file I/O</td></tr>
+<tr><td><code>katakuri::digest</code> (<code>artifact_sha256</code>, <code>sha256_hex</code>)</td><td><code>digest</code></td></tr>
+<tr><td><code>katakuri::checkpoint</code> (<code>load_validated</code>, <code>TrustPolicy</code>)</td><td><code>std</code> + <code>digest</code></td></tr>
+<tr><td><code>katakuri::hub</code> (<code>sha256_hex</code> re-exported)</td><td><code>hub</code> (<strong>implies</strong> <code>digest</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<p>A consumer that only describes architectures never links the hash or file-I/O
+surfaces (wishlist W6). The <code>hub</code> feature carries <code>digest</code> in its dependency
+list; a hand-rolled <code>--cfg feature="hub"</code> build without <code>digest</code> is a compile
+error, and the crate-root docs assert the graph in a doctest.</p>
+<h2 id="what-this-is-not"><a class="header" href="#what-this-is-not">What this is not</a></h2>
+<p>Katakuri does not compute the forward pass. The MLP’s matmuls, the GELU, and
+the determinism question all live in the consuming engine — Amari’s
+hand-rolled tiny matmul in 0.25.0, Borsalino’s kernels later. This page
+describes weights, shapes, ordering, and trust decisions, and stops there.</p>
+<h2 id="canonical-form-and-physical-layout"><a class="header" href="#canonical-form-and-physical-layout">Canonical form and physical layout</a></h2>
+<p>Two independent canonicalizations keep checkpoints stable:</p>
+<ul>
+<li><strong><code>MlpSpec::canonical_json()</code></strong> — a hand-rolled, fixed-key-order document
+(pinned byte-for-byte by a unit test). Its bytes are what <code>ia.schema-hash</code>
+digests. It deliberately does not iterate any <code>serde_json</code> map: a
+downstream consumer enabling <code>serde_json</code>’s <code>preserve_order</code> feature would
+otherwise change the digest through feature unification.</li>
+<li><strong><code>ValidatedCheckpoint::canonical_data_bytes()</code></strong> — tensor data
+concatenated in canonical parameter order (<code>expected_tensors()</code> order,
+depth-first by layer). Loading honors the file’s physical offsets and does
+<strong>not</strong> require canonical arrangement; the bit-stable guarantee is over
+this canonical concatenation, not the input bytes.</li>
+</ul>
+<p>The trust-policy open uses <code>libc</code>’s per-ABI <code>O_NOFOLLOW</code>/<code>O_NONBLOCK</code>
+(unix-only, and optional — activated through the <code>digest</code> feature that
+compiles the checkpoint module, so default and no-default builds carry no
+checkpoint-only dependency) — hand-derived flag tables were wrong twice
+during S5’s development, which is exactly the failure mode a dependency on
+the verified source eliminates.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="safetensors"><a class="header" href="#safetensors"><code>safetensors</code></a></h1>
+<p>Weight parse + validate: dtype, shape, layout, and manifest checks over the
+borrowed input bytes, plus a device-upload seam over <code>zunesha::Device</code>. No
+math.</p>
+<h2 id="format"><a class="header" href="#format">Format</a></h2>
+<p>A safetensors file is an 8-byte little-endian <code>u64</code> header length <code>N</code>, then
+<code>N</code> bytes of JSON header, then the data buffer. Header keys are tensor names
+(or <code>__metadata__</code>); each tensor entry is
+<code>{"dtype", "shape", "data_offsets": [start, end]}</code> with offsets relative to
+the start of the data region.</p>
+<h2 id="parsing"><a class="header" href="#parsing">Parsing</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::safetensors::SafeTensors;
+
+let bytes = std::fs::read("model.safetensors")?;
+let st = SafeTensors::parse(&amp;bytes)?;
+
+println!("{} tensors, {} data bytes", st.tensor_count(), st.data_len());
+for name in st.names() {
+    let t = st.tensor(name)?;
+    println!("{name}: {:?} {:?} ({} bytes)", t.dtype(), t.shape(), t.bytes().len());
+}
+<span class="boring">}</span></code></pre>
+<p>The parse is zero-copy: <code>SafeTensors</code> borrows the slice and tensor views are
+<code>&amp;[u8]</code> windows into it. Nothing here needs a device, which is why GPU-less
+hardware is the first-class path.</p>
+<p>A minimal valid file (the doc-test in <code>lib.rs</code>) is eight bytes of header
+length <code>2</code> followed by <code>{}</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let bytes: &amp;[u8] = &amp;[2, 0, 0, 0, 0, 0, 0, 0, b'{', b'}'];
+let st = SafeTensors::parse(bytes)?;
+assert_eq!(st.tensor_count(), 0);
+<span class="boring">}</span></code></pre>
+<h2 id="validation-contract"><a class="header" href="#validation-contract">Validation contract</a></h2>
+<p>All validation happens at parse time. Every tensor reachable afterwards
+satisfies:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Rule</th><th>Violation</th></tr>
+</thead>
+<tbody>
+<tr><td>header length ≤ 100 MB (DoS guard, matches the reference)</td><td><code>HeaderTooLarge</code></td></tr>
+<tr><td>header length fits the file</td><td><code>HeaderLengthExceedsFile</code></td></tr>
+<tr><td>header is a JSON object</td><td><code>HeaderParse</code> / <code>HeaderNotAnObject</code></td></tr>
+<tr><td><code>__metadata__</code>, when present, is a string→string map</td><td><code>InvalidMetadata</code></td></tr>
+<tr><td>entries carry exactly <code>dtype</code>, <code>shape</code>, <code>data_offsets</code></td><td><code>InvalidTensorInfo</code></td></tr>
+<tr><td>dtype is a safetensors dtype</td><td><code>InvalidDtype</code></td></tr>
+<tr><td><code>start ≤ end ≤ data_len</code></td><td><code>OffsetOutOfBounds</code></td></tr>
+<tr><td><code>end − start == elements × dtype_size</code> (checked u64)</td><td><code>SizeMismatch</code> / <code>SizeOverflow</code></td></tr>
+<tr><td>no two spans overlap (gaps allowed)</td><td><code>OverlappingTensors</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Gaps are legal because real files have them; overlaps never are, because they
+would make two named tensors aliases of the same bytes. Zero-length spans are
+filtered out of the overlap check — an empty tensor claims no bytes and cannot
+conflict (review finding 1).</p>
+<h2 id="types"><a class="header" href="#types">Types</a></h2>
+<p><code>Dtype</code> is the safetensors set: <code>Bool</code>, <code>U8</code>, <code>I8</code>, <code>F8E5M2</code>, <code>F8E4M3</code>,
+<code>I16</code>, <code>U16</code>, <code>F16</code>, <code>Bf16</code>, <code>I32</code>, <code>U32</code>, <code>F32</code>, <code>F64</code>, <code>I64</code>, <code>U64</code>, with
+<code>byte_size()</code> and <code>parse()</code> (canonical string, case-sensitive).</p>
+<p><code>Tensor</code> exposes <code>dtype()</code>, <code>shape()</code>, <code>data_offsets()</code>, <code>bytes()</code>, and
+<code>elem_count()</code>. <code>SafeTensors</code> exposes <code>names()</code>, <code>tensor_count()</code>,
+<code>metadata()</code>, <code>data_len()</code>, and <code>tensor(name)</code>.</p>
+<h2 id="uploading-to-a-device"><a class="header" href="#uploading-to-a-device">Uploading to a device</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let st = SafeTensors::parse(&amp;bytes)?;
+
+match st.upload_to_device("embeddings.word_embeddings.weight", &amp;device) {
+    Ok(device_tensor) =&gt; {
+        // device_tensor.buffer: zunesha::Buffer — GPU-resident weights.
+        // device_tensor.meta:   the manifest entry the bytes were validated against.
+    }
+    Err(katakuri::KatakuriError::Device(err)) =&gt; {
+        // Includes NoDevice: the typed signal that no GPU backend exists —
+        // the host views above stay valid and usable.
+    }
+    Err(other) =&gt; return Err(other),
+}
+<span class="boring">}</span></code></pre>
+<p>The host view remains valid after an upload, so the same weights can feed a
+precision CPU path or a Borsalino GPU path. Alignment and lifecycle
+obligations are Zunesha’s; Katakuri passes buffers through and never restates
+them.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="tokenizer"><a class="header" href="#tokenizer"><code>tokenizer</code></a></h1>
+<p>A bespoke WordPiece (BERT-class) engine: a transcription of the reference
+pipeline, verified byte-for-byte against committed golden vectors.</p>
+<h2 id="constructing"><a class="header" href="#constructing">Constructing</a></h2>
+<p>From a line-per-token vocabulary (BERT defaults: <code>##</code> continuation,
+<code>[UNK]</code>/<code>[CLS]</code>/<code>[SEP]</code>/<code>[PAD]</code> resolved from the vocab,
+<code>max_input_chars_per_word</code> 100, no truncation):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::tokenizer::Tokenizer;
+
+let vocab = std::fs::read("vocab.txt")?;
+let tokenizer = Tokenizer::from_bert_vocab_txt(&amp;vocab)?;
+<span class="boring">}</span></code></pre>
+<p>From a <code>tokenizer.json</code> (strict BERT-class subset):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let json = std::fs::read("tokenizer.json")?;
+let tokenizer = Tokenizer::from_tokenizer_json(&amp;json)?;
+<span class="boring">}</span></code></pre>
+<p><code>from_tokenizer_json</code> accepts <code>BertNormalizer</code>, <code>BertPreTokenizer</code>,
+<code>TemplateProcessing</code> with the single-sequence template <code>[CLS] A [SEP]</code>, a
+<code>WordPiece</code> model, an added-tokens list, and <code>LongestFirst</code> truncation
+(optional). The <code>decoder</code> and <code>padding</code> fields are accepted and ignored —
+single-sequence <code>encode</code> never pads and <code>encode_batch</code> always uses
+<code>BatchLongest</code>.</p>
+<p>Everything else is a typed rejection, because Katakuri never silently diverges
+from a tokenizer configuration it does not implement:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Accepted</th><th>Rejected as</th></tr>
+</thead>
+<tbody>
+<tr><td><code>normalizer</code></td><td><code>BertNormalizer</code></td><td><code>UnsupportedNormalizer</code></td></tr>
+<tr><td><code>pre_tokenizer</code></td><td><code>BertPreTokenizer</code></td><td><code>UnsupportedPreTokenizer</code></td></tr>
+<tr><td><code>post_processor</code></td><td><code>[CLS] A [SEP]</code> template</td><td><code>UnsupportedPostProcessor</code></td></tr>
+<tr><td><code>model</code></td><td><code>WordPiece</code></td><td><code>UnsupportedModel</code></td></tr>
+<tr><td>truncation <code>strategy</code></td><td><code>LongestFirst</code></td><td><code>UnsupportedTruncationStrategy</code></td></tr>
+<tr><td>truncation <code>direction</code></td><td><code>Right</code></td><td><code>UnsupportedTruncationDirection</code></td></tr>
+<tr><td>added tokens</td><td>non-empty, no boundary flags</td><td><code>InvalidTokenizerJson</code></td></tr>
+<tr><td><code>special_tokens</code> map</td><td>present → fully validated; absent → vocab lookup</td><td><code>InvalidTokenizerJson</code></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="encoding"><a class="header" href="#encoding">Encoding</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let encoding = tokenizer.encode("Katakuri never computes.", true);
+assert_eq!(
+    encoding.ids,
+    [101, 29354, 18569, 2072, 2196, 24134, 2015, 1012, 102]
+);
+assert_eq!(encoding.attention_mask, [1, 1, 1, 1, 1, 1, 1, 1, 1]);
+<span class="boring">}</span></code></pre>
+<p>Against the committed MiniLM vocab. <code>encode</code> is infallible: unknown pieces
+become <code>[UNK]</code>, and truncation (when configured) keeps <code>max_length − 2</code>
+content tokens before wrapping in <code>[CLS] … [SEP]</code>.</p>
+<p>Batching right-pads to the batch longest:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let batch = tokenizer.encode_batch(&amp;["a dog", "the weights are ready"], true);
+// [0] ids:  [101, 1037, 3899, 102, 0, 0]      mask: [1, 1, 1, 1, 0, 0]
+// [1] ids:  [101, 1996, 15871, 2024, 3201, 102]
+<span class="boring">}</span></code></pre>
+<p><code>Encoding</code> carries <code>ids: Vec&lt;u32&gt;</code> and <code>attention_mask: Vec&lt;u32&gt;</code>.</p>
+<h2 id="introspection"><a class="header" href="#introspection">Introspection</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>println!("{} tokens", tokenizer.vocab_size());   // 30522 for MiniLM
+println!("max id {}", tokenizer.max_token_id()); // 30521
+<span class="boring">}</span></code></pre>
+<p><code>max_token_id()</code> is the max over the vocab table, added-token ids, and the four
+special ids. It is what the model spec checks against the embedding table —
+<strong>capacity</strong>, not cardinality: a sparse vocab with entry id 40000 in a
+30522-entry table preserves the count but would index past the table (review
+finding 11).</p>
+<h2 id="pipeline"><a class="header" href="#pipeline">Pipeline</a></h2>
+<p><code>encode</code> runs, in order:</p>
+<ol>
+<li><strong>added-token split</strong> on the raw input — leftmost match, longest first;</li>
+<li><strong><code>BertNormalizer</code></strong> — <code>clean_text</code>, CJK spacing, accent strip
+(<code>strip_accents.unwrap_or(lowercase)</code>), then per-character lowercase;</li>
+<li><strong><code>BertPreTokenizer</code></strong> — whitespace split (whitespace removed) plus
+punctuation isolation;</li>
+<li><strong>WordPiece</strong> — greedy longest-match-first with <code>##</code> continuations; failure
+or an over-length word emits a whole-word <code>[UNK]</code>;</li>
+<li><strong>truncation</strong> to <code>max_length − 2</code> content tokens (LongestFirst,
+single-sequence), then <code>[CLS] … [SEP]</code>;</li>
+<li><strong>padding</strong> — only in <code>encode_batch</code> (BatchLongest).</li>
+</ol>
+<p>Step 2 lowercases <strong>per character</strong>, not via <code>str::to_lowercase</code>. That is not a
+performance choice: Rust’s <code>str::to_lowercase</code> applies the contextual final
+sigma rule, so <code>ΟΣ</code> would become <code>ος</code> where the reference produces <code>οσ</code>. The
+golden corpus pins the per-character behavior (review finding 3):</p>
+<pre><code class="language-text">ΟΔΟΣ → "οδοσ" → [101, 1169, 29722, 29730, 29733, 102]
+       ("ο" + "##δ" + "##ο" + "##σ")
+</code></pre>
+<h2 id="parity-evidence"><a class="header" href="#parity-evidence">Parity evidence</a></h2>
+<p>The test suite asserts ids and masks against
+<code>tests/fixtures/golden_minilm.json</code> — 26 single-sequence cases and 3 batch
+cases generated from HF Rust <code>tokenizers</code> 0.21.4 with Ijima’s exact call
+shape. The vocab fixture is committed, so parity replays offline. See
+<a href="#concepts--doctrine">Concepts</a> for the methodology.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="model"><a class="header" href="#model"><code>model</code></a></h1>
+<p>Architecture specs as typed data: strict BERT <code>config.json</code> parsing
+(<code>BertSpec</code>) and weight-layout manifests validated against a parsed
+safetensors file.</p>
+<p>Specs are data, never code — no forward implementations live here, and no
+numerics: weight <em>values</em> are never inspected, only layout (names, dtypes,
+shapes, set completeness).</p>
+<h2 id="parsing-a-config"><a class="header" href="#parsing-a-config">Parsing a config</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::model::{BertSpec, HiddenAct};
+
+let spec = BertSpec::from_config_json(&amp;std::fs::read_to_string("config.json")?)?;
+
+assert_eq!(spec.hidden_size(), 384);
+assert_eq!(spec.num_hidden_layers(), 6);
+assert_eq!(spec.num_attention_heads(), 12);
+assert_eq!(spec.intermediate_size(), 1536);
+assert_eq!(spec.vocab_size(), 30522);
+assert_eq!(spec.max_position_embeddings(), 512);
+assert_eq!(spec.hidden_act(), HiddenAct::Gelu);
+<span class="boring">}</span></code></pre>
+<p>Real <code>all-MiniLM-L6-v2</code> values shown; the same code parses any BERT-class
+config in the supported subset.</p>
+<h3 id="what-is-enforced"><a class="header" href="#what-is-enforced">What is enforced</a></h3>
+<ul>
+<li><code>model_type</code> must be the string <code>"bert"</code> — required; absent rejects.</li>
+<li><code>architectures</code>, when present, must contain <code>"BertModel"</code>.</li>
+<li><code>position_embedding_type</code>, when present, must be <code>"absolute"</code>.</li>
+<li><code>hidden_act</code> must be <code>Gelu</code>, <code>GeluApproximate</code>, or <code>Relu</code>
+(<code>"gelu"</code>, <code>"gelu_approximate"</code>, <code>"relu"</code>). <code>"gelu_new"</code> and friends reject.</li>
+<li>Every size field (<code>hidden_size</code>, <code>num_attention_heads</code>,
+<code>num_hidden_layers</code>, <code>intermediate_size</code>, <code>vocab_size</code>, <code>type_vocab_size</code>,
+<code>max_position_embeddings</code>) must be a positive integer that fits <code>u32</code>;
+<code>num_hidden_layers</code> is additionally bounded at 1024.</li>
+<li><code>hidden_size</code> must be divisible by <code>num_attention_heads</code>.</li>
+<li><code>layer_norm_eps</code> must be finite and <code>&gt; 0.0</code>; <code>pad_token_id</code> must fit <code>u32</code>.</li>
+</ul>
+<p>Tolerated-and-ignored (inference-irrelevant training metadata):
+<code>_name_or_path</code>, <code>attention_probs_dropout_prob</code>, <code>gradient_checkpointing</code>,
+<code>hidden_dropout_prob</code>, <code>initializer_range</code>, <code>transformers_version</code>,
+<code>use_cache</code>, and any other unknown keys. Documented, never read.</p>
+<h2 id="validating-weights-against-the-spec"><a class="header" href="#validating-weights-against-the-spec">Validating weights against the spec</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::safetensors::SafeTensors;
+
+let bytes = std::fs::read("model.safetensors")?;
+let weights = SafeTensors::parse(&amp;bytes)?;
+
+spec.validate_weights(&amp;weights)?;
+<span class="boring">}</span></code></pre>
+<p><code>validate_weights</code> derives the full layout manifest from the spec’s numbers
+(<code>expected_tensors()</code>) and checks that every expected tensor is present with
+that exact shape and dtype <code>F32</code>; nothing unexpected is present, except
+<code>embeddings.position_ids</code>, the sole sanctioned non-parameter tensor, and then
+only as <code>I64 [1, max_position_embeddings]</code>.</p>
+<p>Diagnostics are collected, not first-error-only: one error lists every
+missing / unexpected / wrong-shape / wrong-dtype line.</p>
+<p>For MiniLM the manifest is 103 parameters; a real file carries 104 tensors
+(the extra is the position-ids buffer).</p>
+<h2 id="cross-checking-the-tokenizer"><a class="header" href="#cross-checking-the-tokenizer">Cross-checking the tokenizer</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>spec.check_tokenizer_compatibility(&amp;tokenizer)?;
+<span class="boring">}</span></code></pre>
+<p>The rule is <strong>capacity</strong>, not cardinality: no id the tokenizer can emit may
+index past the embedding table —</p>
+<pre><code class="language-text">max_token_id() + 1 ≤ vocab_size      (checked as: max_token_id() &lt; vocab_size)
+</code></pre>
+<p>The <code>&gt;=</code> form is deliberate. On a 32-bit target (wasm32)
+<code>max_id as usize + 1</code> wraps at <code>u32::MAX</code>, which would admit an id needing
+<code>2^32</code> embedding rows; <code>max_id &gt;= vocab_size</code> is target-independent and
+algebraically identical on 64-bit (review finding 12).</p>
+<p>A tokenizer <em>smaller</em> than the table is legal — vocab-padded configs simply
+leave rows unused. Only overflow rejects.</p>
+<h2 id="the-error-surface"><a class="header" href="#the-error-surface">The error surface</a></h2>
+<p>All malformed, missing, or out-of-subset values return
+<code>KatakuriError::InvalidConfigJson</code> with a <code>detail</code> naming the field and the
+problem; a weight-set divergence returns
+<code>KatakuriError::WeightLayoutMismatch</code> with the full list. Both are constructed
+via <code>thiserror</code>, so the <code>Display</code> text is the diagnostic.</p>
+<h2 id="mlp-specs-020"><a class="header" href="#mlp-specs-020">MLP specs (0.2.0)</a></h2>
+<p>Beside <code>BertSpec</code>, the model module carries the <code>ia-mlp</code> feedforward family —
+<code>MlpSpec</code>, <code>MlpLayerSpec</code>, and <code>Activation</code> (named semantics;
+approximations are named, never inherited). Full grammar, bounds, and the
+canonical JSON form are covered in <a href="#mlp-specs--validated-checkpoints">MLP Specs &amp; Validated
+Checkpoints</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="hub"><a class="header" href="#hub"><code>hub</code></a></h1>
+<p>Model fetch + content-addressed cache, offline-first (feature <code>hub</code>; the
+network transport is feature <code>hub-net</code>).</p>
+<p>Replaces <code>hf-hub</code> as the acquisition path. The default crate gains no
+dependencies from this module: <code>Fetch</code> is a dependency-free trait, <code>sha2</code> is
+the only addition under <code>hub</code>, and <code>ureq</code> only under <code>hub-net</code>.</p>
+<h2 id="the-types"><a class="header" href="#the-types">The types</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Role</th></tr>
+</thead>
+<tbody>
+<tr><td><code>RepoId</code></td><td><code>owner/model</code> identity; strict single/two-segment grammar</td></tr>
+<tr><td><code>Revision</code></td><td>Branch, tag, or 40-hex commit sha — a validating newtype</td></tr>
+<tr><td><code>Hub</code></td><td>The cache + fetcher; <code>new</code>, <code>with_default_root</code>, <code>get</code>, <code>get_with</code>, <code>cached</code>, <code>cache_path</code></td></tr>
+<tr><td><code>Policy</code></td><td><code>CacheFirst</code> (default) or <code>AlwaysFetch</code></td></tr>
+<tr><td><code>Fetch</code></td><td>The transport seam: one method, no dependencies</td></tr>
+<tr><td><code>UreqFetcher</code></td><td>Batteries-included blocking HTTPS transport (<code>hub-net</code>)</td></tr>
+<tr><td><code>sha256_hex</code></td><td>Lowercase-hex sha256 helper (also the sidecar format)</td></tr>
+</tbody>
+</table>
+</div>
+<p>Constructors validate:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::hub::{RepoId, Revision, validate_filename};
+
+let repo = RepoId::parse("sentence-transformers/all-MiniLM-L6-v2")?;
+assert_eq!(repo.as_url_segment(), "sentence-transformers/all-MiniLM-L6-v2");
+
+let rev = Revision::main();                    // "main"
+let pinned = Revision::new("8b3219a92973c328a8e22fadc826d4d1721c4ba7")?;
+validate_filename("model.safetensors")?;
+<span class="boring">}</span></code></pre>
+<p>Grammar: one segment (two for <code>RepoId</code>), each character ASCII alphanumeric or
+<code>-._</code>; no <code>..</code>, <code>/</code>, NUL, or empty segment. <code>Display</code> and <code>FromStr</code>
+round-trip.</p>
+<h2 id="fetch--cache"><a class="header" href="#fetch--cache">Fetch + cache</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::hub::{Hub, Policy, RepoId, Revision, UreqFetcher};
+use std::sync::Arc;
+
+let repo = RepoId::parse("sentence-transformers/all-MiniLM-L6-v2")?;
+let rev = Revision::main();
+let hub = Hub::with_default_root(Arc::new(UreqFetcher::new()))?;
+
+// CacheFirst: verified hit → path; miss/corrupt → fetch → verify → atomic write.
+let path = hub.get(&amp;repo, &amp;rev, "model.safetensors")?;
+
+// Explicit policy: re-fetch and overwrite even on a hit.
+let path = hub.get_with(&amp;repo, &amp;rev, "config.json", Policy::AlwaysFetch)?;
+
+// Offline only: digest-verified hit → Some(path); miss/corrupt → None.
+if let Some(path) = hub.cached(&amp;repo, &amp;rev, "config.json") {
+    let config = std::fs::read_to_string(path)?;
+}
+<span class="boring">}</span></code></pre>
+<p><code>get</code> returns a <strong>local path</strong>, never a URL. <code>cache_path</code> is a pure join:
+useful for display, logging, and pre-flight checks.</p>
+<p>Root resolution: <code>$KATAKURI_HUB_DIR</code>, else <code>$HOME/.cache/katakuri/hub</code>. A
+custom root is just <code>Hub::new(path, fetch)</code>.</p>
+<h2 id="the-transport-seam"><a class="header" href="#the-transport-seam">The transport seam</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::KatakuriError;
+use katakuri::hub::Fetch;
+
+#[derive(Debug)]
+struct Fake {
+    body: Vec&lt;u8&gt;,
+}
+
+impl Fetch for Fake {
+    fn fetch(&amp;self, _url: &amp;str) -&gt; Result&lt;Vec&lt;u8&gt;, KatakuriError&gt; {
+        Ok(self.body.clone())
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><code>Fetch: Send + Sync + Debug</code> with one method:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn fetch(&amp;self, url: &amp;str) -&gt; Result&lt;Vec&lt;u8&gt;, KatakuriError&gt;
+<span class="boring">}</span></code></pre>
+<p>Implementations must be HTTPS and must follow redirects per HTTP semantics.
+Errors flow through <code>KatakuriError::HubFetch</code>. Tests run on fakes, so the hub
+is hermetic; embedding a different HTTP client is one impl block.</p>
+<h2 id="ureqfetcher"><a class="header" href="#ureqfetcher"><code>UreqFetcher</code></a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::hub::UreqFetcher;
+
+let anon = UreqFetcher::new();                       // public repos
+let authed = UreqFetcher::with_token("hf_...");      // gated repos / rate limits
+<span class="boring">}</span></code></pre>
+<ul>
+<li>Blocking; no async runtime.</li>
+<li>rustls; <code>https_only(true)</code> on the agent, so redirect downgrades refuse.</li>
+<li>Sends <code>Authorization: Bearer …</code> when constructed with a token; <code>Debug</code>
+renders <code>Some(&lt;redacted&gt;)</code>.</li>
+<li>Accepts only a final status of 200 and caps the body at
+<code>MAX_BODY_BYTES</code> (1 GiB), reading one byte past the ceiling to detect
+overflow rather than truncate.</li>
+</ul>
+<h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Variant</th><th>Raised by</th></tr>
+</thead>
+<tbody>
+<tr><td><code>UnsafeRepoPath</code></td><td><code>RepoId::parse</code>, <code>Revision::new</code>, <code>validate_filename</code></td></tr>
+<tr><td><code>HubFetch</code></td><td>transport failure, non-HTTPS URL, non-200 final status, body too large</td></tr>
+<tr><td><code>HubCache</code></td><td>root resolution, create/write/rename, unreadable cache</td></tr>
+</tbody>
+</table>
+</div>
+<p>See <a href="#the-hub-fetch--cache">The Hub</a> for layout, security posture, and the recorded
+limitations (no locking, revision-string keying, Windows reserved names).</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="verification"><a class="header" href="#verification">Verification</a></h1>
+<p>Katakuri carries the Borsalino verification pattern in two independent forms:
+<strong>obligation bundles</strong> — machine-readable invariant <em>specifications</em>, exported as SMT-LIB scripts (feature <code>verify</code>; no obligations are discharged by the crate itself — a solver must consume the exported scripts). The karpal-verify SMT exporter has an upstream operator-mapping defect (Karpal#176), pinned pending fix and
+<strong>Kani harnesses</strong> (bounded model checking of the validation arithmetic).</p>
+<h2 id="obligation-bundles-verify"><a class="header" href="#obligation-bundles-verify">Obligation bundles (<code>verify</code>)</a></h2>
+<p>Every property the safetensors validator enforces is exported as a karpal
+obligation, tier
+<a href="https://docs.rs/karpal-verify"><code>Impossible</code></a> — the validator makes the
+illegal state unrepresentable, so “a manifest that parses is a manifest that
+satisfies them”.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>What it prevents</th><th>Enforced by</th></tr>
+</thead>
+<tbody>
+<tr><td><code>IsOffsetInBounds</code></td><td>offsets escaping the data region</td><td><code>OffsetOutOfBounds</code> rejection</td></tr>
+<tr><td><code>IsSpanConsistent</code></td><td>span ≠ shape × dtype bytes</td><td><code>SizeMismatch</code> / <code>SizeOverflow</code> rejection</td></tr>
+<tr><td><code>IsManifestNonOverlapping</code></td><td>two tensors claiming the same bytes</td><td><code>OverlappingTensors</code> rejection</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use katakuri::verify::safetensors_parse_obligations;
+
+let bundle = safetensors_parse_obligations();
+assert_eq!(bundle.name, "katakuri_safetensors_parse");
+assert_eq!(bundle.obligations().len(), 3);
+for obligation in bundle.obligations() {
+    assert!(matches!(obligation.tier, karpal_verify::VerificationTier::Impossible));
+}
+<span class="boring">}</span></code></pre>
+<p><code>verify</code> is optional and pulls <code>karpal-verify</code> / <code>karpal-proof</code> at the version
+Borsalino pins. Bundles export to the karpal SMT / Lean / Kani backends.</p>
+<p>Deferred upstream: the karpal-verify 0.6.1 SMT exporter has no operator
+mapping for the terms these bundles emit, so SMT export is not exercised from
+Katakuri yet (recorded on S1 review round 1; karpal-verify’s own <code>gpu.rs</code>
+uses the same <code>Term::app</code> convention).</p>
+<h2 id="kani-harnesses"><a class="header" href="#kani-harnesses">Kani harnesses</a></h2>
+<p><code>src/kani_harnesses.rs</code> is compiled only under <code>cargo kani</code> (inert in normal
+builds, declared via <code>check-cfg = ['cfg(kani)']</code> so <code>-D warnings</code> stays clean):</p>
+<pre><code class="language-sh">cargo kani --harness span_consistency_arithmetic
+cargo kani --harness span_overflow_rejected
+cargo kani --harness offset_containment_implies_valid_slice
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Harness</th><th>Property proved</th></tr>
+</thead>
+<tbody>
+<tr><td><code>span_consistency_arithmetic</code></td><td>under bounded dims (≤ 65536 each), the span is exactly product × dtype size and a dtype multiple</td></tr>
+<tr><td><code>span_overflow_rejected</code></td><td><code>u64::MAX</code> dims are detected as overflow, never wrapped</td></tr>
+<tr><td><code>offset_containment_implies_valid_slice</code></td><td><code>start ≤ end ≤ data_len</code> implies a non-panicking slice of exactly <code>end − start</code> bytes</td></tr>
+</tbody>
+</table>
+</div>
+<p>The arithmetic they cover lives in a pure function (<code>span_for</code>) deliberately
+separated from parsing, so the proofs target the arithmetic rather than the
+JSON plumbing.</p>
+<p><strong>Status:</strong> the harnesses are written and gated by <code>#[cfg(kani)]</code>, but Kani is
+not installed in CI — executing them is a follow-up, recorded in
+<code>docs/critique.md</code> and the roadmap.</p>
+<h2 id="width-correctness-32-bit-targets"><a class="header" href="#width-correctness-32-bit-targets">Width correctness (32-bit targets)</a></h2>
+<p>Review loops found two 32-bit-only failures that no 64-bit test would catch,
+both from arithmetic that is correct when <code>usize</code> is 64 bits wide:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Finding</th><th>Failure on wasm32</th><th>Fix</th></tr>
+</thead>
+<tbody>
+<tr><td><code>max_token_id() + 1 ≤ vocab_size</code></td><td><code>+ 1</code> wraps to 0 at <code>u32::MAX</code></td><td>compare <code>max_token_id() &gt;= vocab_size</code></td></tr>
+<tr><td><code>5 + 16·L + 2</code> tensor count</td><td>overflows near <code>u32::MAX</code> layers</td><td>reject <code>num_hidden_layers &gt; 1024</code> at parse time</td></tr>
+</tbody>
+</table>
+</div>
+<p>The CI matrix therefore includes a real 32-bit compile:</p>
+<pre><code class="language-sh">cargo check --target wasm32-unknown-unknown --features hub
+</code></pre>
+<p>This is a compile-level guard, not a proof: it keeps the width-sensitive
+code path building, while the two findings above are held by regressions
+(<code>u32_max_token_id_rejects_without_overflow</code>, the 1024/1025 boundary test).</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="review-record"><a class="header" href="#review-record">Review Record</a></h1>
+<p>Every slice (S1–S4) ran a review loop before landing, capped at twelve rounds,
+with findings posted inline on the PR. <strong>Twenty-two root findings</strong> across
+those four loops; <strong>twenty were fixed here with a regression</strong> (severity
+split: 9× P1, 10× P2, 1× P3, all as graded on the PR threads). This page is
+the record, because a review that only leaves “LGTM” behind leaves nothing
+to learn from.</p>
+<p>Three notes on what is counted:</p>
+<ul>
+<li><strong>Two findings are excluded from the twenty</strong> (both real, both dispositioned
+on the PR, both documented in the S1 section): a P3 that strengthened a weak
+test <em>assertion</em> — a test defect, not shipped-code behavior — and a P2
+deferred upstream (the karpal-verify SMT exporter).</li>
+<li>Every retained entry below was reproduced by a regression test (or, in one
+case, by a behavioral repro that cannot be hermetic — noted inline).</li>
+<li>Not every finding was in shipped behaviour: finding 8 was in the <em>test
+harness</em>. That counts — a golden reader that silently truncates can make a
+parity proof lie.</li>
+</ul>
+<h2 id="s1--safetensors"><a class="header" href="#s1--safetensors">S1 — safetensors</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Class</th><th>Finding</th><th>Fix</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>Empty-span overlap (P2)</td><td>Zero-length tensors inside another tensor’s span were falsely rejected as overlapping</td><td>Filter zero-length spans before the overlap check; empty tensors claim no bytes</td></tr>
+<tr><td>2</td><td>Doc-link breakage (P2)</td><td><code>verify</code> module docs failed <code>RUSTDOCFLAGS="-D warnings"</code>: module-level <code>//!</code> links resolve at crate-root scope</td><td>Explicit <code>crate::…</code> paths; the doc gate now joins the matrix in <strong>both</strong> feature configs</td></tr>
+</tbody>
+</table>
+</div>
+<p>Excluded from the retained count (both real, both dispositioned on the PR):</p>
+<ul>
+<li><strong>(P3, test assertion)</strong> the unknown-field rejection test’s assertion was
+too weak to establish that the diagnostic names the offending field —
+adopted and strengthened, but a test defect rather than shipped code.</li>
+<li><strong>(P2, deferred upstream)</strong> karpal-verify 0.6.1’s SMT exporter has no
+operator mapping for the terms Katakuri’s obligations emit (its own
+<code>gpu.rs</code> uses the same <code>Term::app</code> convention) —
+<a href="https://github.com/Industrial-Algebra/Karpal/issues/176">Karpal#176</a>;
+the 0.6.1 pin is retained pending the upstream fix.</li>
+</ul>
+<h2 id="s2--tokenizer"><a class="header" href="#s2--tokenizer">S2 — tokenizer</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Class</th><th>Finding</th><th>Fix</th></tr>
+</thead>
+<tbody>
+<tr><td>3</td><td>Per-character lowercase (P1)</td><td><code>str::to_lowercase</code> applies the contextual final sigma rule, so <code>ΟΣ</code> became <code>ος</code> where HF produces <code>οσ</code></td><td><code>chars().flat_map(char::to_lowercase)</code>; regression pins <code>ΟΔΟΣ → οδοσ</code></td></tr>
+<tr><td>4</td><td>Infinite loop (P1)</td><td>An empty added-token entry matched at every position, so the split never advanced</td><td>Reject empty added tokens at construction; defensive skip in the scan</td></tr>
+<tr><td>5</td><td>Unsupported flags accepted (P2)</td><td><code>single_word</code> / <code>lstrip</code> / <code>rstrip</code> boundary flags were parsed and ignored</td><td>Reject with <code>InvalidTokenizerJson</code> — silently ignoring them changes ids</td></tr>
+<tr><td>6</td><td>Truncation direction (P2)</td><td><code>direction: "Left"</code> was accepted and then silently right-truncated</td><td><code>UnsupportedTruncationDirection</code></td></tr>
+<tr><td>7</td><td>Special-token mapping divergence (P2)</td><td>A <code>post_processor.special_tokens</code> map disagreeing with the vocab silently changed emitted ids</td><td>Validate every mapping when present: singleton expansion, id/token agreement with the vocab</td></tr>
+<tr><td>8</td><td>Unchecked conversion (P3)</td><td>The golden reader used an unchecked cast, so an out-of-range golden would truncate instead of failing</td><td><code>u32::try_from</code>, fail closed</td></tr>
+<tr><td>9</td><td>Malformed maps accepted (P2, round 2)</td><td>A present-but-malformed <code>special_tokens</code> map (<code>null</code>, wrong shape) fell through to a default</td><td>Field-presence match: absent → vocab lookup (documented), present → fully validated</td></tr>
+<tr><td>10</td><td>Id-width divergence (P2, round 3)</td><td>Ids above <code>u32::MAX</code> were accepted, but HF’s <code>Vec&lt;u32&gt;</code> deserialization rejects those bytes</td><td>Require every id to fit <code>u32</code> (<code>4294967296</code> regression)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="s3--model-specs"><a class="header" href="#s3--model-specs">S3 — model specs</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Class</th><th>Finding</th><th>Fix</th></tr>
+</thead>
+<tbody>
+<tr><td>11</td><td>Capacity vs cardinality (P1, round 1)</td><td>The tokenizer/spec check compared vocabulary <em>counts</em>; a sparse id (entry 40000 in a 30522-entry table) passed while encoding could index past the embedding table</td><td>Check <code>max_token_id() + 1 ≤ vocab_size</code> (max over vocab, added-token ids, specials); add <code>Tokenizer::max_token_id</code>; accept the legal vocab-padded class</td></tr>
+<tr><td>12</td><td>wasm32 wrap (P1, round 2)</td><td><code>max_id as usize + 1</code> wraps to 0 at <code>u32::MAX</code> on 32-bit, admitting an id needing <code>2^32</code> rows</td><td>Compare <code>max_id &gt;= vocab_size</code> — target-independent, algebraically identical on 64-bit</td></tr>
+<tr><td>13</td><td>32-bit tensor-count overflow (P1, round 3)</td><td><code>5 + 16·L + 2</code> overflows <code>usize</code> near <code>u32::MAX</code> layers: a parse-valid spec trapped in <code>expected_tensors()</code> on wasm32</td><td>Bound <code>num_hidden_layers ≤ 1024</code> at parse time (&gt;10× the largest known BERT-family encoder)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="s4--hub"><a class="header" href="#s4--hub">S4 — hub</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Class</th><th>Finding</th><th>Fix</th></tr>
+</thead>
+<tbody>
+<tr><td>14</td><td>Namespace shadowing (P1)</td><td>Content and digest sidecars shared a namespace, so a fetched file named <code>x.sha256</code> could shadow a sidecar</td><td>Separate <code>content/</code>, <code>digests/</code>, and temp namespaces; sidecars named exactly the filename</td></tr>
+<tr><td>15</td><td>Case-fold aliasing (P1)</td><td>On case-insensitive filesystems, revisions <code>V1</code>/<code>v1</code> or files <code>Config.json</code>/<code>config.json</code> aliased to one cache entry</td><td>Case-safe encoding (<code>X → ^x</code>) on every case-bearing component; <code>^</code> is outside the grammar, so the map is injective</td></tr>
+<tr><td>16</td><td>Secret in <code>Debug</code> (P1)</td><td><code>UreqFetcher</code>’s derived <code>Debug</code> printed the bearer token</td><td>Manual impl: <code>Some(&lt;redacted&gt;)</code> / <code>None</code> only</td></tr>
+<tr><td>17</td><td>Status laxity (P2)</td><td>Any 2xx (including 204/304) was accepted as file content to be cached</td><td><code>require_final_status</code>: exactly 200 after redirects</td></tr>
+<tr><td>18</td><td>Scheme laxity (P2)</td><td>A non-HTTPS initial URL was accepted, so a bearer could transit plaintext</td><td><code>require_https</code> before building the request</td></tr>
+<tr><td>19</td><td>Feature-unsafe doc links (P2)</td><td>Docs linking hub items broke under <code>--features hub</code> vs <code>hub-net</code> combinations</td><td>Feature-safe link targets; <code>--features hub</code> doc gate added to the matrix</td></tr>
+<tr><td>20</td><td>Redirect downgrade (P1, round 2)</td><td>The HTTPS check gated only the initial URL: an <code>https → http</code> redirect mid-chain delivered attacker-controlled plaintext <strong>content</strong> that was accepted and cached (the round-2 repro ran without a bearer; combined with finding 18’s verified plaintext-bearer path on the initial URL, the downgrade risk follows)</td><td><code>https_only(true)</code> on the agent itself, so ureq refuses the plaintext hop during redirect resolution. Behavioral repro re-run in round 3 (needs a live server; not hermetically testable)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="the-classes-distilled"><a class="header" href="#the-classes-distilled">The classes, distilled</a></h2>
+<p>Seven distinct failure classes account for all twenty findings. They are worth
+naming because each is a <em>recurring</em> way strict data-plane code goes wrong:</p>
+<ol>
+<li><strong>Unicode case folding is context-sensitive where the reference is not.</strong>
+Parity surfaces must transcribe the reference’s exact per-character
+behavior, not Rust’s idiomatic equivalent (finding 3).</li>
+<li><strong>A matcher that can match zero-length input loops forever.</strong> Anyone
+scanning for literal tokens must reject empty needles at construction <em>and</em>
+guard the scan (finding 4).</li>
+<li><strong>Cardinality is not capacity.</strong> “How many entries” and “how large an index
+can this emit” diverge exactly when ids are sparse — and sparse ids are
+legal input (finding 11).</li>
+<li><strong>32-bit arithmetic is where “obviously correct” checks fail.</strong> <code>+ 1</code> after
+a <code>u32</code> at its maximum, and <code>16·L</code> at a large <code>L</code>, are both fine on 64-bit
+and broken on wasm32 (findings 12, 13). Compile the target, don’t reason
+about it.</li>
+<li><strong>Shared namespaces create aliasing.</strong> Content vs sidecar, uppercase vs
+lowercase — any two things a filesystem might fold together must be
+separated structurally, not by convention (findings 14, 15).</li>
+<li><strong>Ignored configuration is silent divergence.</strong> Accepting a flag you do not
+honour (<code>lstrip</code>, <code>Left</code>) changes output without an error; reject instead
+(findings 5, 6, 7).</li>
+<li><strong>A security check on the first request is not a check on the chain.</strong>
+Redirects are part of the transport; enforcing a scheme at the entry point
+and letting the client follow a downgrade is a leak (findings 17, 18, 20).</li>
+</ol>
+<h2 id="why-this-is-published"><a class="header" href="#why-this-is-published">Why this is published</a></h2>
+<p>The review loops were not a formality: nine retained findings were P1s in
+security (namespace shadowing, token redaction, redirect downgrade) or
+correctness (final sigma, the empty-token loop, sparse ids, both wasm32
+arithmetic traps). Publishing them makes the <em>classes</em>
+reusable across the ecosystem rather than relearning them one crate at a time
+— and it keeps an honest record of what <code>0.1.0</code> survived before it shipped.</p>
+<p>The remaining weaknesses that review did <strong>not</strong> close are recorded in
+<code>docs/critique.md</code>.</p>
+<h2 id="s5--mlp-specs--validated-checkpoints-pr-15"><a class="header" href="#s5--mlp-specs--validated-checkpoints-pr-15">S5 — MLP specs + validated checkpoints (PR #15)</a></h2>
+<p>Three rounds: <strong>2×P1 + 2×P2 → 1×P2 → converged zero.</strong> Five root findings,
+all fixed:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Sev</th><th>Round</th><th>Finding</th><th>Fix</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>P1</td><td>r1</td><td>Per-ABI <code>O_NOFOLLOW</code> hand table wrong twice — dispatch grouped all BSD-family under <code>0x100</code>; the in-session re-fix spread x86-64’s value to aarch64 Linux (whose flag is <code>0x8000</code>)</td><td>Table deleted; <code>libc</code> (optional, unix-only, via <code>digest</code>) owns the flags</td></tr>
+<tr><td>2</td><td>P1</td><td>r1</td><td>A FIFO swapped in between the metadata precheck and the open blocks the loader forever (read-end open waits for a writer)</td><td>Probe open is <code>O_NONBLOCK</code>; descriptor check rejects; hang-pinning mkfifo test</td></tr>
+<tr><td>3</td><td>P2</td><td>r1</td><td><code>ia.schema-hash</code> depended on <code>serde_json</code>’s map backing — downstream <code>preserve_order</code> enablement silently changed the digest (two fixture hashes reproduced)</td><td>Hand-rolled fixed-key-order <code>canonical_json</code>, no map iteration; byte-pinned by unit test</td></tr>
+<tr><td>4</td><td>P2</td><td>r1</td><td>“Byte-identical round-trip” overstated — it held only for canonically-written files; reversed physical layouts loaded with no canonicalization witness</td><td><code>canonical_data_bytes()</code> (layout-independent canonical form) + reversed-layout fixture test</td></tr>
+<tr><td>5</td><td>P2</td><td>r2</td><td><code>libc</code> sat in the default and no-default Unix dependency graphs though neither compiles the checkpoint module</td><td><code>libc</code> optional, activated by <code>digest</code>; verified via <code>cargo tree</code> in all graphs</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Classes worth reusing:</strong></p>
+<ol>
+<li><strong>Hand-copied ABI constants are a twice-failed class.</strong> Two independent
+hand-derivations of one flag table were both wrong, each in a different
+way, and both passed every local gate (the targets that would catch them
+weren’t compiled). The dependency carrying the verified per-arch values is
+cheaper than the third attempt.</li>
+<li><strong>Blocking syscalls are denial of service in a validator.</strong> A trust-policy
+loader must bound its own wait: any open that can park (FIFO read end)
+needs the nonblocking flag even when the <em>expected</em> failure is later in
+the pipeline.</li>
+<li><strong>Canonical serialization must not iterate unordered containers —
+including ones that are “usually” ordered.</strong> Feature unification in a
+<em>downstream</em> crate can flip the backing map; a canonical form is a
+protocol, and protocols do not inherit defaults.</li>
+<li><strong>State guarantees over the canonical form, not the input bytes.</strong> A
+loader that accepts arbitrary physical layout owes a named, tested
+canonicalization — “round-trip byte-identical” without that qualifier was
+an overstatement review correctly rejected.</li>
+<li><strong>A new dependency must be feature-scoped to the code that needs it.</strong>
+Target gating excludes platforms; only feature gating excludes
+configurations of your own crate.</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>

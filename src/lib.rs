@@ -40,19 +40,47 @@
 //!   tokenizers 0.21.x (S2). Replaces the `tokenizers` crate dependency.
 //! - [`model`] — typed BERT config + weight-layout manifests, validated
 //!   against parsed safetensors; the Ijima swap boundary (S3). Replaces
-//!   candle-transformers `models::bert`.
+//!   candle-transformers `models::bert`. Also carries the strict `ia-mlp`
+//!   feedforward family ([`model::MlpSpec`]) for Amari's MLP ranker (S5).
+//! - [`manifest`] — the typed layout manifest shared with `borsalino-tensor`
+//!   (the T0 co-sign type, unstable until both sessions review it). Pure
+//!   data: no device or buffer dependency (S5).
+//! - `digest` (optional `digest` feature) — canonical sha256 identities for
+//!   local artifacts; the hub depends on it, not the other way round (S5).
+//! - `checkpoint` (optional `std` + `digest` features) — validated checkpoint
+//!   loading under an explicit trust policy (regular file, byte cap, metadata
+//!   schema/model hashes, shape agreement, optional nonfinite scan). The one
+//!   place values are inspected, and only when the policy asks (S5).
 //! - `hub` (optional `hub` feature) — model fetch + content-addressed
 //!   cache over plain HTTPS, offline-first; `hub-net` adds the ureq/rustls
 //!   transport. Replaces `hf-hub`. Lands with S4.
 //!
 //! ## Features
 //!
-//! - `std` (default): standard-library support
+//! - `std` (default): standard-library support (file I/O for `checkpoint`)
 //! - `verify`: karpal-verify obligation bundles for the parse invariants
 //!   (the Borsalino verification pattern, adapted to a parser crate)
+//! - `digest`: canonical sha256 artifact identities (adds `sha2`)
+//! - `checkpoint` (surface, not a feature name): requires `std` + `digest`
 //! - `hub`: model fetch + content-addressed cache, offline-first
-//!   (adds `sha2` for digest verification)
+//!   (implies `digest`; adds `sha2`)
 //! - `hub-net`: the blocking ureq/rustls HTTPS transport on top of `hub`
+//!
+//! ### The metadata layer builds without I/O features (W6)
+//!
+//! `model` (specs: [`model::BertSpec`], [`model::MlpSpec`]) and `manifest`
+//! are **ungated, pure data**: they build and are usable with no `digest`, no
+//! `hub`, and no `checkpoint` — only `serde_json` (already required by the
+//! safetensors header parse). Consumers that only want to describe an
+//! architecture never link `sha2` or file-I/O policy.
+//!
+//! The feature graph asserts itself at compile time (`hub` without `digest`
+//! is a hard error) and in this doctest:
+//!
+//! ```rust
+//! // `hub` implies `digest` (S5): the hub never carries a second hash impl.
+//! assert!(cfg!(any(not(feature = "hub"), feature = "digest")));
+//! ```
 //!
 //! ## Kani harnesses
 //!
@@ -84,9 +112,23 @@
 
 #![warn(missing_docs)]
 
+// Feature-graph assertion (S5): the hub re-exports the digest helpers, so
+// enabling `hub` without `digest` is a build error rather than a broken link.
+// Cargo's `hub = ["digest"]` makes this unreachable through the feature
+// flags; it guards hand-rolled `--cfg feature="hub"` builds.
+#[cfg(all(feature = "hub", not(feature = "digest")))]
+compile_error!(
+    "feature `hub` requires `digest` (S5 feature graph); enable `hub`, not `digest` alone"
+);
+
+#[cfg(all(feature = "std", feature = "digest"))]
+pub mod checkpoint;
+#[cfg(feature = "digest")]
+pub mod digest;
 pub mod error;
 #[cfg(feature = "hub")]
 pub mod hub;
+pub mod manifest;
 pub mod model;
 pub mod safetensors;
 pub mod tokenizer;

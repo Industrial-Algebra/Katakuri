@@ -5,9 +5,84 @@ All notable changes to Katakuri are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] — 2026-10-20
 
-Nothing yet — the `0.1.0` items below ship together as the first release.
+Additive minor bump: MLP architecture specs (wishlist W1), validated
+checkpoint loading (W2), and the `digest` feature re-homing (W5), plus the
+Borsalino T0 layout-manifest proposal. Undated until published; `0.1.0`
+stays as-is.
+
+### Added — S5: MLP specs + validated checkpoints (2026-10-19)
+
+- `model`: `MlpSpec`, `MlpLayerSpec`, `Activation` — a strict `ia-mlp`
+  feedforward family beside `BertSpec` (separate families, shared
+  invariants; `BertSpec` is not generalized). Grammar: `model_type:
+  "ia-mlp"`, `schema_version: 1`, `input_width 1..=4096`, `0..=8` hidden
+  layers of width `1..=16384`, scalar `head: {width: 1}`, and named
+  activations (`relu`, `tanh`, `gelu_erf`, `gelu_tanh` — approximations
+  named, never inherited). `expected_tensors()` returns the canonical
+  depth-first order (W1).
+- `checkpoint` (`std` + `digest`): `load_validated` + `TrustPolicy` carrying
+  Amari Task 43's trust policy — regular-file check (`symlink_metadata` +
+  `O_NOFOLLOW` + `fstat`; hardlinks accepted), byte cap, `ia.spec`
+  (`MlpSpec`) parsing, shape/schema agreement against `expected_tensors()`,
+  schema/model hash verification, and an optional nonfinite scan. Ordered,
+  failure-total, hashes before values (W2).
+- Provenance convention: `ia.schema-hash`, `ia.model-hash`, `ia.spec`,
+  `ia.provenance.training-data` (`1..=4096` bytes); unknown `ia.*` keys
+  reject. `MlpSpec::canonical_json()` is the deterministic serialization the
+  schema hash covers (W2 bonus).
+- `manifest`: `TensorManifest`, `ManifestEntry`, `ManifestDtype`,
+  `ManifestLayout`, `DeterminismPolicy`, `FastPathPolicy` — the Katakuri side
+  of the Borsalino T0 co-sign (typed shape/offset/dtype layout, F32 pinned,
+  row-major contiguous, fast paths forbidden). Pure data: no `zunesha`
+  dependency. **Unstable until the Borsalino tensor-extension session
+  reviews it** (the gate is named in the module docs) (T0).
+- `digest` (default-off): `artifact_sha256`, plus the S4-compatible
+  `sha256_hex` alias. Moved out of `hub`; `hub` depends on `digest` and
+  re-exports both, so no hub API breaks (W5).
+- Tests: grammar adversarials and parse-time bounds (including the
+  no-32-bit-wrap boundary at maximum legal sizes), symlink/FIFO/hardlink
+  fixtures, byte-cap boundaries, both hash-tamper classes, nonfinite
+  rejection including subnormal-kept and scan-off NaN, canonical byte-
+  identical round-trip, a manifest ≡ `expected_tensors()` property over
+  generated legal specs, and one committed tiny synthetic checkpoint
+  (`tests/fixtures/tiny-mlp.safetensors`) exercising the full policy-on
+  path. Book page: `guide/mlp-specs.md`.
+
+### Changed
+
+- `sha2` pinned to exactly `0.11.0` (`0.11.1` requires Rust 1.88; MSRV is
+  1.85). Feature graph: `digest = ["dep:sha2"]`, `hub = ["dep:sha2",
+  "digest"]` — hub-on-digest-off is now unrepresentable and asserted at
+  compile time.
+- The metadata layer (specs, manifest) builds with no `digest`, no `hub`, and
+  no `checkpoint` — the W6 feature map is documented in the crate docs.
+
+### Fixed — S5 review round 1
+
+- **P1 (twice-failed class):** per-ABI `O_NOFOLLOW` is now taken from `libc`
+  (unix-only target dep) — hand-derived values were wrong twice (all-BSD
+  `0x100`; then x86-64's value on aarch64 Linux, whose flag is `0x8000`).
+- **P1:** the trust-policy open now includes `O_NONBLOCK`, so a FIFO swapped
+  in between the metadata precheck and the open returns immediately for the
+  descriptor check instead of blocking indefinitely on the read end.
+- **P2:** `MlpSpec::canonical_json` is a hand-rolled fixed-key-order writer —
+  iterating `serde_json::Map` made `ia.schema-hash` depend on the map backing
+  (any downstream `preserve_order` enablement silently changed the digest);
+  the format is pinned byte-for-byte by a unit test.
+- **P2:** the round-trip guarantee is now stated and enforced over the
+  canonical form: `ValidatedCheckpoint::canonical_data_bytes()` concatenates
+  tensor data in canonical parameter order, layout-independent; a
+  reversed-physical-layout fixture test proves equal canonical bytes over
+  different file bytes.
+
+### Fixed — S5 review round 2
+
+- **P2:** `libc` is now an optional unix-only dependency activated via
+  `digest` (the feature that compiles the checkpoint module) — default and
+  no-default Unix dependency graphs carry no checkpoint-only dependency
+  (verified with `cargo tree` in all four configurations; wasm32 unaffected).
 
 ## [0.1.0] — 2026-10-17
 

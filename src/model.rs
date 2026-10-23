@@ -2,15 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Architecture specs as typed data: strict BERT `config.json` parsing
-//! ([`BertSpec`]) and weight-layout manifests validated against parsed
-//! safetensors ([`crate::safetensors::SafeTensors`]).
+//! ([`BertSpec`]), strict `ia-mlp` feedforward parsing ([`MlpSpec`]), and
+//! weight-layout manifests validated against parsed safetensors
+//! ([`crate::safetensors::SafeTensors`]).
 //!
 //! Specs are data, never code — no forward implementations live here,
 //! and no numerics: weight *values* are never inspected, only layout
 //! (names, dtypes, shapes, set completeness). The layer replaces
 //! candle-transformers `models::bert` config parsing at Ijima's swap
-//! boundary (see `docs/plans/` S3 port plan); candle stays behind
-//! Ijima's non-default `embeddings-candle` feature throughout.
+//! boundary (see `docs/plans/` S3 port plan) and describes Amari's small
+//! MLP ranker (S5, wishlist W1); candle stays behind Ijima's non-default
+//! `embeddings-candle` feature throughout.
+//!
+//! The two families are separate specs sharing invariants (strict
+//! `model_type` gating, parse-time bounds, `expected_tensors()` as the
+//! compatibility oracle) — `BertSpec` is deliberately not generalized.
 
 use crate::error::KatakuriError;
 use crate::safetensors::Dtype;
@@ -430,6 +436,323 @@ impl BertSpec {
 
 fn invalid_config(detail: String) -> KatakuriError {
     KatakuriError::InvalidConfigJson { detail }
+}
+
+fn invalid_mlp(detail: String) -> KatakuriError {
+    KatakuriError::MlpSpecParse { detail }
+}
+
+// ── MLP (ia-mlp) feedforward specs (S5) ───────────────────────────
+
+/// Largest accepted `input_width` for an [`MlpSpec`].
+///
+/// Derived shapes stay far below any 32-bit wrap point: the widest single
+/// layer is `16384 × 16384 = 268_435_456` elements, which fits a 32-bit
+/// `usize` (the wasm32 review lesson, S3/S5).
+const MLP_MAX_INPUT_WIDTH: u64 = 4096;
+
+/// Largest accepted hidden-layer count. `expected_tensors()` derives
+/// `2 + 2·hidden.len()` entries — no multiplication by an unbounded input.
+const MLP_MAX_HIDDEN_LAYERS: usize = 8;
+
+/// Largest accepted output width for any [`MlpLayerSpec`].
+const MLP_MAX_LAYER_WIDTH: u64 = 16384;
+
+/// Activation with pinned, backend-independent semantics.
+///
+/// Approximations are NAMED as approximations — never inherited from a
+/// backend. The candle lesson (`GeluApproximate`): activation semantics are
+/// decided, named, and versioned here, while the arithmetic belongs to the
+/// consumer (Katakuri never computes).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Activation {
+    /// Rectified linear unit: `max(0, x)`.
+    Relu,
+    /// Hyperbolic tangent.
+    Tanh,
+    /// Exact GELU: `0.5x(1+erf(x/√2))`. Erf is evaluated by the CONSUMER;
+    /// this enum names the semantics, it does not compute.
+    GeluErf,
+    /// Tanh-approximation GELU (candle's `GeluApproximate` semantics — the
+    /// exact function Ijima pinned; the pin becomes a named choice).
+    GeluTanh,
+}
+
+impl Activation {
+    /// The canonical spec string for this activation: `"relu"`, `"tanh"`,
+    /// `"gelu_erf"`, or `"gelu_tanh"`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Relu => "relu",
+            Self::Tanh => "tanh",
+            Self::GeluErf => "gelu_erf",
+            Self::GeluTanh => "gelu_tanh",
+        }
+    }
+}
+
+/// One feedforward layer's output width.
+///
+/// Weight layout is implied by position in the stack: a layer with width `w`
+/// following a layer (or input) of width `i` carries `weight: [w, i]`
+/// row-major and `bias: [w]`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct MlpLayerSpec {
+    /// Output width of this layer.
+    pub width: u32,
+}
+
+/// Feedforward (MLP) architecture spec — strict family
+/// `model_type: "ia-mlp"`.
+///
+/// A layer list, activations, and shapes: an architecture description, not a
+/// hub model name. Construct via [`MlpSpec::from_json`]; `expected_tensors()`
+/// is the compatibility oracle (canonical parameter order included).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct MlpSpec {
+    /// Input feature width.
+    pub input_width: u32,
+    /// Hidden layers, in order. Bounded: `hidden.len() <= 8`.
+    pub hidden: Vec<MlpLayerSpec>,
+    /// Final linear to a scalar score: output width is always 1.
+    pub head: MlpLayerSpec,
+    /// Activation applied after every hidden layer.
+    pub hidden_activation: Activation,
+}
+
+impl MlpSpec {
+    /// Parses and validates an `ia-mlp` spec JSON document.
+    ///
+    /// # Grammar (strict)
+    ///
+    /// ```json
+    /// {
+    ///   "model_type": "ia-mlp",
+    ///   "schema_version": 1,
+    ///   "input_width": 64,
+    ///   "hidden": [{"width": 256}],
+    ///   "head": {"width": 1},
+    ///   "hidden_activation": "gelu_erf"
+    /// }
+    /// ```
+    ///
+    /// - `model_type` is **required** and must be exactly `"ia-mlp"`; any
+    ///   other value rejects with an error naming both supported families
+    ///   (`"bert"` / `"ia-mlp"`).
+    /// - `schema_version` is **required** and must be exactly `1` — a
+    ///   forward-compatibility gate, not a promise.
+    /// - `input_width` is required, `1 ..= 4096`.
+    /// - `hidden` is required, length `0 ..= 8`; each entry is an object with
+    ///   a required `width`, `1 ..= 16384`.
+    /// - `head` is required, an object with a required `width`; the head is a
+    ///   scalar score, so `width` must be exactly `1`.
+    /// - `hidden_activation` is required and must be one of `"relu"`,
+    ///   `"tanh"`, `"gelu_erf"`, `"gelu_tanh"`.
+    ///
+    /// Unrecognized keys are tolerated and ignored (the S3 construction
+    /// discipline: the consumed surface is strict, training metadata is not
+    /// this crate's business). The checkpoint metadata convention is where
+    /// unknown keys reject — §5.5 of the S5 plan.
+    ///
+    /// Every bound is checked with plain comparisons on the parsed integers:
+    /// no `+1`, no subtraction, no multiplication at parse time, so the
+    /// checks cannot wrap on a 32-bit target (wasm32 lesson, re-applied).
+    ///
+    /// # Errors
+    ///
+    /// [`KatakuriError::MlpSpecParse`] on malformed JSON, a missing or
+    /// out-of-subset field, or a value outside the bounds above; `detail`
+    /// names the field and the problem.
+    pub fn from_json(json: &str) -> Result<Self, KatakuriError> {
+        let value: Value = serde_json::from_str(json)
+            .map_err(|e| invalid_mlp(format!("spec is not valid JSON: {e}")))?;
+        let obj = value
+            .as_object()
+            .ok_or_else(|| invalid_mlp("spec root must be a JSON object".to_string()))?;
+
+        match obj.get("model_type").and_then(Value::as_str) {
+            Some("ia-mlp") => {}
+            Some(other) => {
+                return Err(invalid_mlp(format!(
+                    "model_type '{other}' is not supported (only \"bert\" or \"ia-mlp\")"
+                )));
+            }
+            None => {
+                return Err(invalid_mlp(
+                    "model_type is required and must be the string \"ia-mlp\" (or \"bert\" \
+                     for the BERT family)"
+                        .to_string(),
+                ));
+            }
+        }
+
+        match obj.get("schema_version").and_then(Value::as_u64) {
+            Some(1) => {}
+            Some(other) => {
+                return Err(invalid_mlp(format!(
+                    "schema_version {other} is not supported (only 1)"
+                )));
+            }
+            None => {
+                return Err(invalid_mlp(
+                    "schema_version is required and must be the integer 1".to_string(),
+                ));
+            }
+        }
+
+        let input_width = mlp_width(obj.get("input_width"), "input_width", MLP_MAX_INPUT_WIDTH)?;
+
+        let hidden_raw = obj
+            .get("hidden")
+            .and_then(Value::as_array)
+            .ok_or_else(|| invalid_mlp("hidden is required and must be an array".to_string()))?;
+        if hidden_raw.len() > MLP_MAX_HIDDEN_LAYERS {
+            return Err(invalid_mlp(format!(
+                "hidden has {} layers, above the supported maximum of {MLP_MAX_HIDDEN_LAYERS}",
+                hidden_raw.len()
+            )));
+        }
+        let mut hidden = Vec::with_capacity(hidden_raw.len());
+        for (index, entry) in hidden_raw.iter().enumerate() {
+            let layer = entry
+                .as_object()
+                .ok_or_else(|| invalid_mlp(format!("hidden[{index}] must be an object")))?;
+            let field = format!("hidden[{index}].width");
+            hidden.push(MlpLayerSpec {
+                width: mlp_width(layer.get("width"), &field, MLP_MAX_LAYER_WIDTH)?,
+            });
+        }
+
+        let head_obj = obj
+            .get("head")
+            .and_then(Value::as_object)
+            .ok_or_else(|| invalid_mlp("head is required and must be an object".to_string()))?;
+        let head_width = mlp_width(head_obj.get("width"), "head.width", MLP_MAX_LAYER_WIDTH)?;
+        if head_width != 1 {
+            return Err(invalid_mlp(format!(
+                "head.width must be exactly 1 (the head produces a scalar score), got {head_width}"
+            )));
+        }
+
+        let hidden_activation = match obj.get("hidden_activation").and_then(Value::as_str) {
+            Some("relu") => Activation::Relu,
+            Some("tanh") => Activation::Tanh,
+            Some("gelu_erf") => Activation::GeluErf,
+            Some("gelu_tanh") => Activation::GeluTanh,
+            Some(other) => {
+                return Err(invalid_mlp(format!(
+                    "hidden_activation '{other}' is outside the supported set \
+                     (relu, tanh, gelu_erf, gelu_tanh)"
+                )));
+            }
+            None => {
+                return Err(invalid_mlp(
+                    "hidden_activation is required and must be one of relu, tanh, gelu_erf, \
+                     gelu_tanh"
+                        .to_string(),
+                ));
+            }
+        };
+
+        Ok(Self {
+            input_width,
+            hidden,
+            head: MlpLayerSpec { width: head_width },
+            hidden_activation,
+        })
+    }
+
+    /// The expected weight tensor set as `(name, shape)` pairs, in the
+    /// canonical parameter order: depth-first, layer order —
+    /// `hidden.0.weight`, `hidden.0.bias`, …, `head.weight`, `head.bias`.
+    ///
+    /// Shapes: each `weight` is `[out, in]` (row-major) and each `bias` is
+    /// `[out]`; the head's output width is 1. This order IS the canonical
+    /// ordering validated checkpoint round-trips rely on (S5 §5.1).
+    ///
+    /// Bounded arithmetic: with `width <= 16384`, the largest derived
+    /// dimension is `16384 × 16384 = 268_435_456`, which fits a 32-bit
+    /// `usize` — every parse-valid spec can call this without trapping.
+    #[must_use]
+    pub fn expected_tensors(&self) -> Vec<(String, Vec<usize>)> {
+        let mut out = Vec::with_capacity(2 + 2 * self.hidden.len());
+        let mut in_width = self.input_width;
+        for (index, layer) in self.hidden.iter().enumerate() {
+            out.push((
+                format!("hidden.{index}.weight"),
+                vec![layer.width as usize, in_width as usize],
+            ));
+            out.push((format!("hidden.{index}.bias"), vec![layer.width as usize]));
+            in_width = layer.width;
+        }
+        out.push((
+            "head.weight".to_string(),
+            vec![self.head.width as usize, in_width as usize],
+        ));
+        out.push(("head.bias".to_string(), vec![self.head.width as usize]));
+        out
+    }
+
+    /// The canonical JSON serialization of this spec: a deterministic,
+    /// fixed-key-order document with exactly the grammar fields.
+    ///
+    /// The bytes of this string are what `ia.schema-hash` digests (S5 §5.5),
+    /// so two semantically identical specs hash identically regardless of the
+    /// input document's whitespace or key order.
+    ///
+    /// Hand-rolled on purpose (review r1, P2): iterating a `serde_json::Map`
+    /// made the output depend on the map's backing — any downstream consumer
+    /// enabling serde_json's `preserve_order` feature flips it to
+    /// insertion-ordered via feature unification, silently changing
+    /// `ia.schema-hash`. This writer emits fixed keys in fixed order with no
+    /// map in sight; the format is pinned byte-for-byte by a unit test.
+    #[must_use]
+    pub fn canonical_json(&self) -> String {
+        let activation = self.hidden_activation.as_str();
+        debug_assert!(
+            activation
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c == '_')
+        );
+        let mut s = String::with_capacity(96 + self.hidden.len() * 16);
+        s.push_str("{\"head\":{\"width\":");
+        s.push_str(&self.head.width.to_string());
+        s.push_str("},\"hidden\":[");
+        for (i, layer) in self.hidden.iter().enumerate() {
+            if i > 0 {
+                s.push(',');
+            }
+            s.push_str("{\"width\":");
+            s.push_str(&layer.width.to_string());
+            s.push('}');
+        }
+        s.push_str("],\"hidden_activation\":\"");
+        s.push_str(activation);
+        s.push_str("\",\"input_width\":");
+        s.push_str(&self.input_width.to_string());
+        s.push_str(",\"model_type\":\"ia-mlp\",\"schema_version\":1}");
+        s
+    }
+}
+
+/// Parse one required MLP width field: a non-negative JSON integer, `>= 1`
+/// and `<= max`.
+///
+/// Comparisons only — no `+1`, no subtraction, no multiplication — so the
+/// bounds cannot wrap on a 32-bit target.
+fn mlp_width(raw: Option<&Value>, field: &str, max: u64) -> Result<u32, KatakuriError> {
+    let value = raw.and_then(Value::as_u64).ok_or_else(|| {
+        invalid_mlp(format!(
+            "{field} is required and must be a non-negative integer"
+        ))
+    })?;
+    if value == 0 || value > max {
+        return Err(invalid_mlp(format!(
+            "{field} must be in 1..={max}, got {value}"
+        )));
+    }
+    u32::try_from(value).map_err(|_| invalid_mlp(format!("{field} {value} does not fit u32")))
 }
 
 /// Parse a positive size field that must fit `u32` (id-space
@@ -897,6 +1220,288 @@ mod tests {
         max["num_hidden_layers"] = json!(1024);
         let spec = parse_config(&max).expect("1024 layers parses");
         assert_eq!(spec.expected_tensors().len(), 5 + 16 * 1024 + 2);
+    }
+
+    // ── MLP (ia-mlp) specs (S5) ───────────────────────────────
+
+    fn mlp_json() -> Value {
+        json!({
+            "model_type": "ia-mlp",
+            "schema_version": 1,
+            "input_width": 2,
+            "hidden": [{"width": 3}, {"width": 4}],
+            "head": {"width": 1},
+            "hidden_activation": "relu",
+        })
+    }
+
+    fn parse_mlp(v: &Value) -> Result<MlpSpec, KatakuriError> {
+        MlpSpec::from_json(&v.to_string())
+    }
+
+    fn mlp_rejects(v: &Value) -> bool {
+        matches!(parse_mlp(v), Err(KatakuriError::MlpSpecParse { .. }))
+    }
+
+    #[test]
+    fn mlp_parses_and_derives_canonical_order() {
+        let spec = parse_mlp(&mlp_json()).expect("legal ia-mlp spec parses");
+        assert_eq!(spec.input_width, 2);
+        assert_eq!(spec.hidden.len(), 2);
+        assert_eq!(spec.head.width, 1);
+        assert_eq!(spec.hidden_activation, Activation::Relu);
+        assert_eq!(spec.expected_tensors().len(), 6);
+
+        // Depth-first, layer order: hidden.N.weight, hidden.N.bias, …,
+        // head.weight, head.bias.
+        let names: Vec<String> = spec
+            .expected_tensors()
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                "hidden.0.weight",
+                "hidden.0.bias",
+                "hidden.1.weight",
+                "hidden.1.bias",
+                "head.weight",
+                "head.bias",
+            ]
+        );
+        let shapes: Vec<Vec<usize>> = spec
+            .expected_tensors()
+            .into_iter()
+            .map(|(_, shape)| shape)
+            .collect();
+        assert_eq!(
+            shapes,
+            vec![
+                vec![3, 2],
+                vec![3],
+                vec![4, 3],
+                vec![4],
+                vec![1, 4],
+                vec![1],
+            ]
+        );
+    }
+
+    #[test]
+    fn mlp_accepts_empty_hidden_stack() {
+        let mut v = mlp_json();
+        v["hidden"] = json!([]);
+        let spec = parse_mlp(&v).expect("zero hidden layers is legal");
+        let tensors = spec.expected_tensors();
+        assert_eq!(tensors.len(), 2);
+        assert_eq!(tensors[0].0, "head.weight");
+        assert_eq!(tensors[0].1, vec![1, 2]);
+        assert_eq!(tensors[1].0, "head.bias");
+        assert_eq!(tensors[1].1, vec![1]);
+    }
+
+    #[test]
+    fn mlp_model_type_gate_names_both_families() {
+        let mut bert = mlp_json();
+        bert["model_type"] = json!("bert");
+        match parse_mlp(&bert) {
+            Err(KatakuriError::MlpSpecParse { detail }) => {
+                assert!(detail.contains("\"bert\""), "{detail}");
+                assert!(detail.contains("\"ia-mlp\""), "{detail}");
+            }
+            other => panic!("expected MlpSpecParse, got {other:?}"),
+        }
+
+        let mut unknown = mlp_json();
+        unknown["model_type"] = json!("gpt2");
+        assert!(mlp_rejects(&unknown));
+
+        let mut absent = mlp_json();
+        absent.as_object_mut().unwrap().remove("model_type");
+        match parse_mlp(&absent) {
+            Err(KatakuriError::MlpSpecParse { detail }) => {
+                assert!(detail.contains("\"bert\""), "{detail}");
+                assert!(detail.contains("\"ia-mlp\""), "{detail}");
+            }
+            other => panic!("expected MlpSpecParse, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mlp_schema_version_is_required_and_pinned() {
+        for bad in [json!(null), json!(2), json!(0), json!("1")] {
+            let mut v = mlp_json();
+            v["schema_version"] = bad.clone();
+            assert!(mlp_rejects(&v), "schema_version {bad} must reject");
+        }
+
+        let mut absent = mlp_json();
+        absent.as_object_mut().unwrap().remove("schema_version");
+        assert!(mlp_rejects(&absent));
+    }
+
+    #[test]
+    fn mlp_rejects_unknown_activation_and_missing_fields() {
+        for act in ["relu", "tanh", "gelu_erf", "gelu_tanh"] {
+            let mut v = mlp_json();
+            v["hidden_activation"] = json!(act);
+            parse_mlp(&v).unwrap_or_else(|e| panic!("{act} should parse: {e}"));
+        }
+
+        let mut unknown = mlp_json();
+        unknown["hidden_activation"] = json!("gelu_new");
+        assert!(mlp_rejects(&unknown));
+
+        for field in ["hidden_activation", "input_width", "hidden", "head"] {
+            let mut missing = mlp_json();
+            missing.as_object_mut().unwrap().remove(field);
+            assert!(mlp_rejects(&missing), "missing {field} must reject");
+        }
+    }
+
+    #[test]
+    fn mlp_bounds_reject_at_the_edges() {
+        // input_width: 1..=4096
+        for ok in [1, 4096] {
+            let mut v = mlp_json();
+            v["input_width"] = json!(ok);
+            assert!(parse_mlp(&v).is_ok(), "input_width {ok} should parse");
+        }
+        for bad in [0, 4097, 1_u64 << 40] {
+            let mut v = mlp_json();
+            v["input_width"] = json!(bad);
+            assert!(mlp_rejects(&v), "input_width {bad} must reject");
+        }
+
+        // layer width: 1..=16384
+        for ok in [1, 16384] {
+            let mut v = mlp_json();
+            v["hidden"] = json!([{"width": ok}]);
+            assert!(parse_mlp(&v).is_ok(), "width {ok} should parse");
+        }
+        for bad in [0, 16385] {
+            let mut v = mlp_json();
+            v["hidden"] = json!([{"width": bad}]);
+            assert!(mlp_rejects(&v), "width {bad} must reject");
+        }
+
+        // hidden.len(): 0..=8
+        let eight: Vec<Value> = (0..8).map(|_| json!({"width": 4})).collect();
+        let mut ok = mlp_json();
+        ok["hidden"] = Value::Array(eight);
+        assert!(parse_mlp(&ok).is_ok(), "8 hidden layers should parse");
+
+        let nine: Vec<Value> = (0..9).map(|_| json!({"width": 4})).collect();
+        let mut bad_layers = mlp_json();
+        bad_layers["hidden"] = Value::Array(nine);
+        assert!(mlp_rejects(&bad_layers), "9 hidden layers must reject");
+
+        // The head is a scalar score: width is exactly 1.
+        for bad in [0, 2, 16384] {
+            let mut v = mlp_json();
+            v["head"] = json!({"width": bad});
+            assert!(mlp_rejects(&v), "head width {bad} must reject");
+        }
+
+        // Non-integer widths reject (no silent coercion).
+        let mut negative = mlp_json();
+        negative["input_width"] = json!(-1);
+        assert!(mlp_rejects(&negative));
+        let mut float = mlp_json();
+        float["input_width"] = json!(2.5);
+        assert!(mlp_rejects(&float));
+        let mut stringy = mlp_json();
+        stringy["hidden"] = json!([{"width": "3"}]);
+        assert!(mlp_rejects(&stringy));
+    }
+
+    /// Boundary values at the maximum legal sizes: `expected_tensors()` must
+    /// not wrap a 32-bit `usize` (the wasm32 lesson). The widest derived
+    /// dimension is `16384 × 16384 = 268_435_456` (a hidden→hidden weight),
+    /// reached here even with the maximum legal input width of 4096.
+    #[test]
+    fn mlp_max_bounds_derive_without_wrapping() {
+        let hidden: Vec<Value> = (0..8).map(|_| json!({"width": 16384})).collect();
+        let mut v = mlp_json();
+        v["input_width"] = json!(4096);
+        v["hidden"] = Value::Array(hidden);
+        let spec = parse_mlp(&v).expect("maximum-size spec parses");
+        let tensors = spec.expected_tensors();
+        assert_eq!(tensors.len(), 2 + 2 * 8);
+        assert_eq!(tensors[0].1, vec![16384, 4096]);
+        // hidden.1.weight is [16384, 16384]: the largest derived element
+        // count, 268_435_456, which fits a 32-bit usize by a wide margin.
+        assert_eq!(tensors[2].1, vec![16384, 16384]);
+        let widest_elements = tensors
+            .iter()
+            .map(|(_, shape)| shape.iter().product::<usize>())
+            .max()
+            .expect("derived shapes are never empty");
+        assert_eq!(widest_elements, 268_435_456);
+        assert!(widest_elements <= u32::MAX as usize);
+    }
+
+    #[test]
+    fn mlp_ignores_unknown_keys() {
+        // The consumed surface is strict; unknown training metadata is
+        // tolerated (the S3 discipline). Unknown `ia.*` metadata keys are
+        // where strictness lives — the checkpoint convention, not the spec.
+        let mut v = mlp_json();
+        v["training_notes"] = json!("irrelevant");
+        v["hidden"][0]["notes"] = json!("also irrelevant");
+        assert!(parse_mlp(&v).is_ok());
+    }
+
+    #[test]
+    fn canonical_json_format_is_pinned_byte_for_byte() {
+        // The format is part of ia.schema-hash's definition; any change here
+        // changes every committed hash. Fixed order, compact, no whitespace —
+        // and, by construction, independent of serde_json's map backing
+        // (preserve_order feature unification cannot reach a hand-rolled
+        // writer with no map iteration).
+        let spec = MlpSpec {
+            input_width: 64,
+            hidden: vec![MlpLayerSpec { width: 256 }, MlpLayerSpec { width: 128 }],
+            head: MlpLayerSpec { width: 1 },
+            hidden_activation: Activation::GeluTanh,
+        };
+        assert_eq!(
+            spec.canonical_json(),
+            "{\"head\":{\"width\":1},\"hidden\":[{\"width\":256},{\"width\":128}],\
+             \"hidden_activation\":\"gelu_tanh\",\"input_width\":64,\
+             \"model_type\":\"ia-mlp\",\"schema_version\":1}"
+        );
+    }
+
+    #[test]
+    fn mlp_canonical_json_is_order_and_space_independent() {
+        let a = parse_mlp(&mlp_json()).expect("legal spec");
+        let reordered = r#"{ "hidden_activation": "relu",
+            "head": { "width": 1 }, "hidden": [ {"width": 3}, {"width": 4} ],
+            "input_width": 2, "schema_version": 1, "model_type": "ia-mlp" }"#;
+        let b = MlpSpec::from_json(reordered).expect("same spec, different order");
+        assert_eq!(a, b);
+        assert_eq!(a.canonical_json(), b.canonical_json());
+        assert_eq!(
+            a.canonical_json(),
+            "{\"head\":{\"width\":1},\"hidden\":[{\"width\":3},{\"width\":4}],\
+             \"hidden_activation\":\"relu\",\"input_width\":2,\"model_type\":\"ia-mlp\",\
+             \"schema_version\":1}"
+        );
+        // The canonical form re-parses to the same spec (round-trip).
+        assert_eq!(
+            MlpSpec::from_json(&a.canonical_json()).expect("canonical form parses"),
+            a
+        );
+    }
+
+    #[test]
+    fn activation_names_are_the_grammar_strings() {
+        assert_eq!(Activation::Relu.as_str(), "relu");
+        assert_eq!(Activation::Tanh.as_str(), "tanh");
+        assert_eq!(Activation::GeluErf.as_str(), "gelu_erf");
+        assert_eq!(Activation::GeluTanh.as_str(), "gelu_tanh");
     }
 }
 

@@ -11,6 +11,7 @@
 
 - [Feature Flags](./guide/feature-flags.md)
 - [The Hub: Fetch & Cache](./guide/hub.md)
+- [MLP Specs & Validated Checkpoints](./guide/mlp-specs.md)
 
 # API Reference
 
