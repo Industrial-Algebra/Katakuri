@@ -14,6 +14,11 @@ jobs:
     environment: publish
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the gitflow guard's merge-base needs shared
+          # history between the tag and main — depth-1 shards can make a
+          # legitimate tag look unreachable.
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Verify tag matches Cargo.toml version
@@ -31,19 +36,10 @@ jobs:
       # develop commit while main sat at the scaffold.
       - name: Verify tag is on main's history (ia-gitflow)
         run: |
-          git fetch origin main --depth=1 --no-tags
+          git fetch origin main --no-tags
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "::error::tag $GITHUB_REF_NAME ($GITHUB_SHA) is NOT reachable from main — ia-gitflow requires the release PR merged to main BEFORE tagging. Not publishing."
             exit 1
           fi
       - name: cargo publish
         run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-  announce:
-    needs: publish
-    uses: Industrial-Algebra/IA-home/.github/workflows/release-announce.yml@main
-    with:
-      product_name: "Katakuri"
-      version: ${{ github.ref_name }}
-      release_notes: "See the changelog: https://github.com/Industrial-Algebra/Katakuri/blob/main/CHANGELOG.md"
-    secrets:
-      ADMIN_API_KEY: ${{ secrets.IA_BLOG_API_KEY }}

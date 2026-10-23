@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0f082cac.js";
+            window.path_to_searchindex_js = "searchindex-5ad3ddba.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-bec584ff.js"></script>
@@ -242,11 +242,14 @@ deployment class) is a first-class requirement, not a fallback. Katakuri is a
 <em>consumer</em> of Zunesha, never a wrapper: buffers flow through, and alignment
 and lifecycle obligations remain Zunesha’s.</p>
 <h2 id="status"><a class="header" href="#status">Status</a></h2>
-<p><code>0.1.0</code>: slices S1 (safetensors), S2 (tokenizer), S3 (model specs), and S4
-(hub) are complete. These are the four surfaces that replaced candle and
-<code>hf-hub</code> in Ijima’s embedding path; the tokenizer is bit-for-bit identical
-to the reference on the committed golden vectors, and the forward pass stays
-in the consumer, as designed.</p>
+<p><code>0.2.0</code>: slices S1 (safetensors), S2 (tokenizer), S3 (model specs), S4
+(hub), and S5 (MLP specs + validated checkpoints) are complete. The first
+four replaced candle and <code>hf-hub</code> in Ijima’s embedding path — the tokenizer
+bit-for-bit identical to the reference on the committed golden vectors, the
+forward pass staying in the consumer, as designed. S5 adds the Amari
+learned-rewrite seams: the <code>ia-mlp</code> architecture family, the
+<code>TensorManifest</code> layout proposal for Borsalino’s tensor extension, and
+checkpoint loading under an explicit trust policy.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
 <h2 id="add-the-dependency"><a class="header" href="#add-the-dependency">Add the dependency</a></h2>
@@ -1129,6 +1132,12 @@ leave rows unused. Only overflow rejects.</p>
 problem; a weight-set divergence returns
 <code>KatakuriError::WeightLayoutMismatch</code> with the full list. Both are constructed
 via <code>thiserror</code>, so the <code>Display</code> text is the diagnostic.</p>
+<h2 id="mlp-specs-020"><a class="header" href="#mlp-specs-020">MLP specs (0.2.0)</a></h2>
+<p>Beside <code>BertSpec</code>, the model module carries the <code>ia-mlp</code> feedforward family —
+<code>MlpSpec</code>, <code>MlpLayerSpec</code>, and <code>Activation</code> (named semantics;
+approximations are named, never inherited). Full grammar, bounds, and the
+canonical JSON form are covered in <a href="#mlp-specs--validated-checkpoints">MLP Specs &amp; Validated
+Checkpoints</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="hub"><a class="header" href="#hub"><code>hub</code></a></h1>
 <p>Model fetch + content-addressed cache, offline-first (feature <code>hub</code>; the
