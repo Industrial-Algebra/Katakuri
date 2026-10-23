@@ -14,6 +14,11 @@ jobs:
     environment: publish
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the gitflow guard's merge-base needs shared
+          # history between the tag and main — depth-1 shards can make a
+          # legitimate tag look unreachable.
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Verify tag matches Cargo.toml version
@@ -31,19 +36,41 @@ jobs:
       # develop commit while main sat at the scaffold.
       - name: Verify tag is on main's history (ia-gitflow)
         run: |
-          git fetch origin main --depth=1 --no-tags
+          git fetch origin main --no-tags
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "::error::tag $GITHUB_REF_NAME ($GITHUB_SHA) is NOT reachable from main — ia-gitflow requires the release PR merged to main BEFORE tagging. Not publishing."
             exit 1
           fi
       - name: cargo publish
         run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+  # Inlined (was IA-home's reusable workflow): IA-home is PRIVATE and this
+  # repo is PUBLIC — GitHub rejects cross-repo reusable calls from public
+  # repos at workflow-validation time (zero-job failure, first v0.2.0 tag).
+  # The POST mirrors IA-home's release-announce.yml verbatim.
   announce:
     needs: publish
-    uses: Industrial-Algebra/IA-home/.github/workflows/release-announce.yml@main
-    with:
-      product_name: "Katakuri"
-      version: ${{ github.ref_name }}
-      release_notes: "See the changelog: https://github.com/Industrial-Algebra/Katakuri/blob/main/CHANGELOG.md"
-    secrets:
-      ADMIN_API_KEY: ${{ secrets.IA_BLOG_API_KEY }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create blog post
+        run: |
+          TITLE="Katakuri ${{ github.ref_name }} Released"
+          SLUG=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-//;s/-$//')
+          BODY="Katakuri ${{ github.ref_name }} is now available on [crates.io](https://crates.io/crates/katakuri).
+
+          See the changelog: https://github.com/Industrial-Algebra/Katakuri/blob/main/CHANGELOG.md
+
+          Docs (mdBook): https://katakuri-embed.netlify.app"
+          EXCERPT="Katakuri ${{ github.ref_name }} is now available."
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg slug "$SLUG" \
+            --arg body "$BODY" \
+            --arg excerpt "$EXCERPT" \
+            --arg tags "release,Katakuri" \
+            '{title: $title, slug: $slug, body: $body, excerpt: $excerpt, tags: ($tags | split(","))}')
+          curl -s -X POST https://industrialalgebra.com/api/admin/posts \
+            -H "Authorization: Bearer ${{ secrets.IA_BLOG_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            -w "\nHTTP %{http_code}\n"
+          echo "::notice::Announced Katakuri ${{ github.ref_name }}"
