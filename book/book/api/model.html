@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0f082cac.js";
+            window.path_to_searchindex_js = "../searchindex-5ad3ddba.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-bec584ff.js"></script>
@@ -260,6 +260,12 @@ leave rows unused. Only overflow rejects.</p>
 problem; a weight-set divergence returns
 <code>KatakuriError::WeightLayoutMismatch</code> with the full list. Both are constructed
 via <code>thiserror</code>, so the <code>Display</code> text is the diagnostic.</p>
+<h2 id="mlp-specs-020"><a class="header" href="#mlp-specs-020">MLP specs (0.2.0)</a></h2>
+<p>Beside <code>BertSpec</code>, the model module carries the <code>ia-mlp</code> feedforward family —
+<code>MlpSpec</code>, <code>MlpLayerSpec</code>, and <code>Activation</code> (named semantics;
+approximations are named, never inherited). Full grammar, bounds, and the
+canonical JSON form are covered in <a href="../guide/mlp-specs.html">MLP Specs &amp; Validated
+Checkpoints</a>.</p>
 
                     </main>
 

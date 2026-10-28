@@ -97,3 +97,11 @@ All malformed, missing, or out-of-subset values return
 problem; a weight-set divergence returns
 `KatakuriError::WeightLayoutMismatch` with the full list. Both are constructed
 via `thiserror`, so the `Display` text is the diagnostic.
+
+## MLP specs (0.2.0)
+
+Beside `BertSpec`, the model module carries the `ia-mlp` feedforward family —
+`MlpSpec`, `MlpLayerSpec`, and `Activation` (named semantics;
+approximations are named, never inherited). Full grammar, bounds, and the
+canonical JSON form are covered in [MLP Specs & Validated
+Checkpoints](../guide/mlp-specs.md).
