@@ -961,3 +961,280 @@ fn tiny_fixture_spec_moment_set() {
     .expect("the S5 fixture spec validates as an optimizer-state subject");
     assert_eq!(state.optimizer_state_version, 1);
 }
+
+// ── Round 1 review: bounded diagnostics (P2a) ─────────────────────
+//
+// The doctrine: a rejection never copies unbounded untrusted input into its
+// message. Every file-derived string or shape echoed by a diagnostic is
+// capped at a documented small constant, truncated on a UTF-8 boundary,
+// escaped, and length-stamped — so a 100,000-byte metadata value (or tensor
+// name, or shape rank) still produces a small message.
+
+/// No optimizer diagnostic may exceed this many bytes, whatever the input.
+const MAX_DIAGNOSTIC_BYTES: usize = 1024;
+
+/// Assert the diagnostic stays small and render a bounded excerpt for the
+/// failure message (a panicking assertion must not itself dump 100 KB).
+fn assert_bounded(error: &OptimizerStateError) {
+    let message = error.to_string();
+    assert!(
+        message.len() <= MAX_DIAGNOSTIC_BYTES,
+        "diagnostic is {} bytes (cap {MAX_DIAGNOSTIC_BYTES}); first 120 chars: {:?}",
+        message.len(),
+        message.chars().take(120).collect::<String>()
+    );
+}
+
+#[test]
+fn malformed_metadata_diagnostic_is_bounded() {
+    let spec = spec(2, &[3], "relu");
+    let huge = "x".repeat(100_000);
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            .set_meta(META_STEP, &huge)
+            .build(),
+        "huge-step",
+        &permissive_policy(),
+        &spec,
+    );
+    assert!(matches!(
+        error,
+        OptimizerStateError::MalformedMetadata { .. }
+    ));
+    assert_bounded(&error);
+    assert!(
+        error.to_string().contains("100000"),
+        "the true length is stamped: {}",
+        error
+    );
+}
+
+#[test]
+fn metadata_diagnostic_truncates_on_a_utf8_boundary() {
+    let spec = spec(2, &[3], "relu");
+    // 2 bytes per char: a naive 64-byte slice would split a `char`.
+    let widthful = "é".repeat(5_000);
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            .set_meta(META_OPTIMIZER_STATE_VERSION, &widthful)
+            .build(),
+        "utf8-step",
+        &permissive_policy(),
+        &spec,
+    );
+    assert!(matches!(
+        error,
+        OptimizerStateError::MalformedMetadata { .. }
+    ));
+    assert_bounded(&error);
+}
+
+#[test]
+fn diagnostics_escape_control_characters() {
+    let spec = spec(2, &[3], "relu");
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            .set_meta(META_STEP, "12\n34")
+            .build(),
+        "control-step",
+        &permissive_policy(),
+        &spec,
+    );
+    let message = error.to_string();
+    assert_bounded(&error);
+    assert!(
+        !message.contains('\n'),
+        "a diagnostic is one line — control characters are escaped: {message:?}"
+    );
+}
+
+#[test]
+fn unexpected_tensor_name_diagnostic_is_bounded() {
+    let spec = spec(2, &[3], "relu");
+    let huge_name = format!("{}{SUFFIX_FIRST_MOMENT}", "n".repeat(100_000));
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            .set_tensor(&huge_name, Dtype::F32, vec![1], f32_bytes(1, 0.0))
+            .build(),
+        "huge-name",
+        &permissive_policy(),
+        &spec,
+    );
+    assert!(matches!(
+        error,
+        OptimizerStateError::UnexpectedTensor { .. }
+    ));
+    assert_bounded(&error);
+    assert!(
+        error.to_string().contains("100000"),
+        "the true name length is stamped: {}",
+        error
+    );
+}
+
+#[test]
+fn moment_shape_diagnostic_is_bounded_for_huge_ranks() {
+    let spec = spec(2, &[3], "relu");
+    // Rank 100_000 of `1`s: a legal S1 shape (product 1, so a 4-byte span)
+    // and a perfectly legal way to make `{:?}` of a shape enormous.
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            .set_tensor(
+                "head.bias.adamw.m",
+                Dtype::F32,
+                vec![1; 100_000],
+                f32_bytes(1, 0.0),
+            )
+            .build(),
+        "huge-rank",
+        &permissive_policy(),
+        &spec,
+    );
+    assert!(matches!(
+        error,
+        OptimizerStateError::MomentShapeMismatch { .. }
+    ));
+    assert_bounded(&error);
+    assert!(
+        error.to_string().contains("100000"),
+        "the true rank is stamped: {}",
+        error
+    );
+}
+
+#[test]
+fn parameter_mismatch_diagnostic_is_bounded_for_huge_ranks() {
+    let spec = spec(2, &[3], "relu");
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            .with_weights()
+            .set_tensor("head.bias", Dtype::F32, vec![1; 100_000], f32_bytes(1, 0.0))
+            .build(),
+        "huge-rank-param",
+        &permissive_policy(),
+        &spec,
+    );
+    assert!(matches!(
+        error,
+        OptimizerStateError::ParameterMismatch { .. }
+    ));
+    assert_bounded(&error);
+}
+
+#[test]
+fn unsupported_optimizer_diagnostic_is_bounded() {
+    let spec = spec(2, &[3], "relu");
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            .set_meta(META_OPTIMIZER, &"o".repeat(100_000))
+            .build(),
+        "huge-optimizer",
+        &permissive_policy(),
+        &spec,
+    );
+    assert!(matches!(
+        error,
+        OptimizerStateError::UnsupportedOptimizer { .. }
+    ));
+    assert_bounded(&error);
+}
+
+// ── Round 1 review: semantic spec comparison (P2b) ────────────────
+
+#[test]
+fn whitespace_equivalent_declared_spec_is_accepted() {
+    let spec = spec(2, &[3], "relu");
+    let canonical = spec.canonical_json();
+    let pretty = serde_json::to_string_pretty(
+        &serde_json::from_str::<Value>(&canonical).expect("canonical JSON parses"),
+    )
+    .expect("re-serialize");
+    assert_ne!(pretty, canonical, "the fixtures really differ textually");
+
+    let state = load(
+        &StateBuilder::new(spec.clone())
+            .set_meta("ia.spec", &pretty)
+            .build(),
+        "spec-pretty",
+        &strict_policy(),
+        &spec,
+    )
+    .expect("whitespace-equivalent declared spec is the same spec");
+    assert_eq!(state.step, 42);
+}
+
+#[test]
+fn reordered_key_declared_spec_is_accepted() {
+    let spec = spec(2, &[3], "relu");
+    let reordered = r#"{
+        "hidden_activation" : "relu" ,
+        "head" : { "width" : 1 } ,
+        "hidden" : [ { "width" : 3 } ] ,
+        "input_width" : 2 ,
+        "schema_version" : 1 ,
+        "model_type" : "ia-mlp"
+    }"#;
+    let state = load(
+        &StateBuilder::new(spec.clone())
+            .set_meta("ia.spec", reordered)
+            .build(),
+        "spec-reordered",
+        &permissive_policy(),
+        &spec,
+    )
+    .expect("key order is not semantic");
+    assert_eq!(state.step, 42);
+}
+
+#[test]
+fn malformed_declared_spec_is_not_a_mismatch() {
+    let spec = spec(2, &[3], "relu");
+    for (tag, declared) in [
+        ("spec-junk", "not json at all"),
+        ("spec-bert", r#"{"model_type":"bert","schema_version":1}"#),
+        ("spec-empty", ""),
+    ] {
+        let error = expect_error(
+            &StateBuilder::new(spec.clone())
+                .set_meta("ia.spec", declared)
+                .build(),
+            tag,
+            &permissive_policy(),
+            &spec,
+        );
+        assert!(
+            !matches!(error, OptimizerStateError::SpecMismatch { .. }),
+            "a malformed declared spec is its own typed error, not a mismatch ({tag}): {error:?}"
+        );
+        assert_bounded(&error);
+    }
+}
+
+#[test]
+fn malformed_declared_spec_diagnostic_is_bounded() {
+    let spec = spec(2, &[3], "relu");
+    // Legal JSON, illegal spec: the activation string is the bad value and it
+    // is 100 KB long — the MlpSpec parser quotes it in its own detail.
+    let bad = json!({
+        "model_type": "ia-mlp",
+        "schema_version": 1,
+        "input_width": 2,
+        "hidden": [{"width": 3}],
+        "head": {"width": 1},
+        "hidden_activation": "a".repeat(100_000),
+    })
+    .to_string();
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            .set_meta("ia.spec", &bad)
+            .build(),
+        "spec-huge-value",
+        &permissive_policy(),
+        &spec,
+    );
+    assert!(
+        !matches!(error, OptimizerStateError::SpecMismatch { .. }),
+        "typed as a malformed spec: {error:?}"
+    );
+    assert_bounded(&error);
+}
