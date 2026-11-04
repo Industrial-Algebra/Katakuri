@@ -21,8 +21,8 @@ use katakuri::optimizer::{
     MAX_DIAGNOSTIC_EXCERPT_BYTES, MAX_DIAGNOSTIC_SHAPE_DIMS, META_OPTIMIZER,
     META_OPTIMIZER_STATE_VERSION, META_STEP, MomentKind, OPTIMIZER_ADAMW, OPTIMIZER_STATE_VERSION,
     OptimizerState, OptimizerStateError, SUFFIX_FIRST_MOMENT, SUFFIX_SECOND_MOMENT,
-    bounded_excerpt, expected_optimizer_tensors, load_optimizer_state, moment_name, shape_excerpt,
-    split_moment_name,
+    bounded_excerpt, expected_optimizer_tensors, load_optimizer_state, moment_name,
+    name_list_excerpt, shape_excerpt, split_moment_name,
 };
 use katakuri::safetensors::Dtype;
 use serde_json::{Value, json};
@@ -1369,4 +1369,40 @@ fn partial_parameters_diagnostic_is_bounded_for_hand_built_specs() {
         message.contains("19997 more"),
         "the true remainder of the capped name list is stamped: {message}"
     );
+}
+
+#[test]
+fn name_list_excerpt_caps_entries_and_stamps_the_remainder() {
+    assert_eq!(name_list_excerpt(&[]), "");
+    assert_eq!(
+        name_list_excerpt(&["a.bias", "a.weight"]),
+        "a.bias, a.weight",
+        "a short list renders in full, with no remainder stamp"
+    );
+    assert_eq!(
+        name_list_excerpt(&["n0", "n1", "n2", "n3"]),
+        "n0, n1, n2, n3",
+        "a list at the cap renders fully"
+    );
+    let many: Vec<String> = (0..1000).map(|i| format!("hidden.{i}.weight")).collect();
+    let refs: Vec<&str> = many.iter().map(String::as_str).collect();
+    let rendered = name_list_excerpt(&refs);
+    assert_eq!(
+        rendered,
+        "hidden.0.weight, hidden.1.weight, hidden.2.weight, hidden.3.weight, ... and 996 more",
+        "the true remainder is stamped"
+    );
+    assert!(
+        rendered.len() < 512,
+        "bounded regardless of list length: {} bytes",
+        rendered.len()
+    );
+}
+
+#[test]
+fn name_list_excerpt_bounds_each_name() {
+    let huge = "n".repeat(100_000);
+    let rendered = name_list_excerpt(&[huge.as_str()]);
+    assert!(rendered.contains("(100000 bytes)"), "{rendered}");
+    assert!(rendered.len() < 512, "{} bytes", rendered.len());
 }

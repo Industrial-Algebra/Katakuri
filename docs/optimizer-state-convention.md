@@ -214,16 +214,26 @@ nor a shape's rank (`[1, 1, …]` with 100,000 dims is a legal shape with a
 |---|---|
 | metadata value, tensor name, malformed spec detail | `bounded_excerpt`: ≤ `MAX_DIAGNOSTIC_EXCERPT_BYTES` (64) input bytes, truncated on a UTF-8 boundary, control characters escaped (a diagnostic stays one line), true byte length stamped when truncated |
 | shape | `shape_excerpt`: ≤ `MAX_DIAGNOSTIC_SHAPE_DIMS` (8) dims, true rank stamped when truncated |
+| list of names | `name_list_excerpt`: ≤ `MAX_DIAGNOSTIC_NAME_LIST` (4) entries, each bounded, then `... and N more` with the true remainder |
 
-`bounded_excerpt` is public: consumers writing their own diagnostics against
-this convention use the same cap rather than inventing one.
+All three helpers are public: consumers writing their own diagnostics against
+this convention use the same caps rather than inventing their own.
 
-Scope of the guarantee: every string field of `OptimizerStateError` that can
-originate in the file is bounded, and the only `Vec`-typed fields left are
-`usize`/enum data. `PartialParameters`'s `detail` names **spec** parameters,
-so it is bounded by the spec grammar (at most 18 names of ~16 bytes), never
-by file input. S5 failures pass through as `Checkpoint(KatakuriError)` and
-keep S5's own diagnostics, which are outside this convention's guarantee.
+Scope of the guarantee: **every field of every `OptimizerStateError`
+constructor is bounded, with no provenance assumption.** Two lessons are
+folded in here:
+
+- *Names and shapes are untrusted even when they look structural.* S1 bounds
+  neither a tensor name's length nor a shape's rank.
+- *A spec is not necessarily parse-validated.* `MlpSpec`'s fields are public,
+  so hand-built specs are legal input to this API; a 10,000-layer spec is
+  constructible and derives 20,002 parameter names. "Bounded by the spec
+  grammar" is true only of parse-validated specs, so the missing-name list is
+  capped and remainder-stamped instead (PR #22 round 2: that message was
+  377,901 bytes before the cap).
+
+S5 failures pass through as `Checkpoint(KatakuriError)` and keep S5's own
+diagnostics, which are outside this convention's guarantee.
 
 ## 9. Reference API
 

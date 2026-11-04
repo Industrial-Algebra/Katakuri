@@ -123,6 +123,14 @@ pub const OPTIMIZER_STATE_VERSION: u32 = 1;
 /// one-line rejection into a 100 KB allocation (PR #22 round 1, P2a).
 pub const MAX_DIAGNOSTIC_EXCERPT_BYTES: usize = 64;
 
+/// Largest number of names rendered into a diagnostic list.
+///
+/// A missing-name list is *not* spec-grammar-bounded: [`MlpSpec`]'s fields
+/// are public, so a hand-built 10,000-layer spec is legal input and derives
+/// 20,002 parameters (PR #22 round 2). Lists are therefore capped at this
+/// many entries and stamped with the true remainder.
+pub const MAX_DIAGNOSTIC_NAME_LIST: usize = 4;
+
 /// Largest shape rank rendered into a diagnostic.
 ///
 /// S1 does not bound a shape's rank — `[1, 1, … 1]` (100,000 dims) is a legal
@@ -181,6 +189,33 @@ pub fn shape_excerpt(shape: &[usize]) -> String {
         out.push_str(&tail);
     } else {
         out.push(']');
+    }
+    out
+}
+
+/// Render a list of names for a diagnostic: at most
+/// [`MAX_DIAGNOSTIC_NAME_LIST`] entries, each bounded by [`bounded_excerpt`],
+/// then `... and N more` with the true remainder.
+///
+/// Provenance-free by construction: it holds no matter how the list was
+/// produced, which is the point — a spec is a public struct, not a
+/// parse-validated document.
+#[must_use]
+pub fn name_list_excerpt(names: &[&str]) -> String {
+    let shown = names.len().min(MAX_DIAGNOSTIC_NAME_LIST);
+    let mut out = String::with_capacity(shown * (MAX_DIAGNOSTIC_EXCERPT_BYTES + 2) + 32);
+    for (index, name) in names[..shown].iter().enumerate() {
+        if index > 0 {
+            out.push_str(", ");
+        }
+        out.push_str(&bounded_excerpt(name));
+    }
+    if names.len() > shown {
+        let tail = format!("... and {} more", names.len() - shown);
+        if shown > 0 {
+            out.push_str(", ");
+        }
+        out.push_str(&tail);
     }
     out
 }
@@ -464,7 +499,7 @@ impl OptimizerState {
                     "parameter tensors must be absent or complete; found {} of {}; missing {}",
                     params_found,
                     param_names.len(),
-                    missing.join(", ")
+                    name_list_excerpt(&missing)
                 ),
             });
         }
@@ -678,15 +713,24 @@ fn scan_nonfinite(tensors: &[ParsedTensor]) -> Result<(), KatakuriError> {
 ///
 /// # Bounded diagnostics
 ///
-/// Every string this enum carries that could originate in the file (metadata
-/// values, tensor names, a malformed declared spec) is a
-/// [`bounded_excerpt`]: at most [`MAX_DIAGNOSTIC_EXCERPT_BYTES`] input bytes,
-/// UTF-8-boundary truncated, control-escaped, true length stamped when
-/// truncated. Untrusted shapes are rendered by [`shape_excerpt`]: at most
-/// [`MAX_DIAGNOSTIC_SHAPE_DIMS`] dims, true rank stamped. The only unbounded
-/// text left is [`Self::PartialParameters`]'s `detail`, which names spec
-/// parameters — bounded by the spec grammar itself (`ia-mlp` derives at most
-/// 18 names of at most ~16 bytes), never by file input.
+/// **The invariant is provenance-free: no constructor produces an unbounded
+/// message, whatever produced its input.**
+///
+/// - Untrusted text (metadata values, tensor names, a malformed declared
+///   spec) is a [`bounded_excerpt`]: at most [`MAX_DIAGNOSTIC_EXCERPT_BYTES`]
+///   input bytes, UTF-8-boundary truncated, control-escaped, true length
+///   stamped when truncated.
+/// - Shapes are rendered by [`shape_excerpt`]: at most
+///   [`MAX_DIAGNOSTIC_SHAPE_DIMS`] dims, true rank stamped.
+/// - Name lists (a missing-parameter list) are rendered by
+///   [`name_list_excerpt`]: at most [`MAX_DIAGNOSTIC_NAME_LIST`] entries,
+///   true remainder stamped.
+///
+/// The list cap deliberately assumes nothing about the spec's provenance:
+/// [`MlpSpec`]'s fields are public, so a hand-built 10,000-layer spec (which
+/// the strict JSON grammar would reject) is legal input to this API and
+/// derives 20,002 parameter names. "Bounded by the spec grammar" holds only
+/// for parse-validated specs, so it is not an argument this type may use.
 #[derive(Debug, Error)]
 pub enum OptimizerStateError {
     /// An S5 checkpoint failure: file/policy checks, S1 parse, `ia.*`
