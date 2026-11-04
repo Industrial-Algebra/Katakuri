@@ -267,7 +267,7 @@ pub fn load_validated(
 }
 
 /// Apply the trust policy's file checks and read the bytes.
-fn read_checkpoint(path: &Path, policy: &TrustPolicy) -> Result<Vec<u8>, KatakuriError> {
+pub(crate) fn read_checkpoint(path: &Path, policy: &TrustPolicy) -> Result<Vec<u8>, KatakuriError> {
     if policy.regular_file_only {
         ensure_regular_file(path)?;
     }
@@ -375,7 +375,9 @@ fn open_checkpoint(path: &Path, nofollow: bool) -> Result<File, KatakuriError> {
 
 /// Validate the `ia.*` metadata convention (S5 §5.5). Only `ia.*` keys are
 /// governed: metadata outside the namespace is the writer's business.
-fn check_metadata_convention(metadata: &BTreeMap<String, String>) -> Result<(), KatakuriError> {
+pub(crate) fn check_metadata_convention(
+    metadata: &BTreeMap<String, String>,
+) -> Result<(), KatakuriError> {
     for (key, value) in metadata {
         match key.as_str() {
             META_SPEC | META_SCHEMA_HASH | META_MODEL_HASH => {}
@@ -470,7 +472,7 @@ fn scan_nonfinite(spec: &MlpSpec, parsed: &SafeTensors<'_>) -> Result<(), Kataku
 ///
 /// S1 does not expose the raw data slice, and the format's prefix is fixed:
 /// 8-byte little-endian header length, then header, then data.
-fn data_section(bytes: &[u8]) -> Result<&[u8], KatakuriError> {
+pub(crate) fn data_section(bytes: &[u8]) -> Result<&[u8], KatakuriError> {
     let prefix: [u8; 8] = bytes
         .get(..8)
         .and_then(|slice| slice.try_into().ok())

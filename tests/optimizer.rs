@@ -21,6 +21,7 @@ use katakuri::optimizer::{
     META_OPTIMIZER, META_OPTIMIZER_STATE_VERSION, META_STEP, MomentKind, OPTIMIZER_ADAMW,
     OPTIMIZER_STATE_VERSION, OptimizerState, OptimizerStateError, SUFFIX_FIRST_MOMENT,
     SUFFIX_SECOND_MOMENT, expected_optimizer_tensors, load_optimizer_state, moment_name,
+    split_moment_name,
 };
 use katakuri::safetensors::Dtype;
 use serde_json::{Value, json};
@@ -316,6 +317,22 @@ fn golden_suffixes_are_frozen() {
         moment_name("hidden.0.weight", MomentKind::Second),
         "hidden.0.weight.adamw.v"
     );
+    // The naming rule in machine form: a name ending in a suffix is optimizer
+    // state, never a parameter.
+    assert_eq!(
+        split_moment_name("hidden.0.weight.adamw.m"),
+        Some(("hidden.0.weight", MomentKind::First))
+    );
+    assert_eq!(
+        split_moment_name("head.bias.adamw.v"),
+        Some(("head.bias", MomentKind::Second))
+    );
+    assert_eq!(split_moment_name("hidden.0.weight"), None);
+    assert_eq!(
+        split_moment_name(".adamw.m"),
+        None,
+        "an empty parameter part is not a moment"
+    );
     let _ = (
         META_OPTIMIZER_STATE_VERSION,
         OPTIMIZER_STATE_VERSION,
@@ -379,11 +396,24 @@ fn complete_moment_set_validates_under_the_strict_policy() {
         "validated tensors are in lexicographic canonical order"
     );
     assert!(state.tensors.iter().all(|t| t.dtype == Dtype::F32));
-    assert!(
-        state
-            .tensors
-            .iter()
-            .all(|t| t.shape.as_slice() == [1] || t.shape.len() == 2)
+    let shapes: Vec<(&str, &[usize])> = state
+        .tensors
+        .iter()
+        .map(|t| (t.name.as_str(), t.shape.as_slice()))
+        .collect();
+    assert_eq!(
+        shapes,
+        vec![
+            ("head.bias.adamw.m", &[1][..]),
+            ("head.bias.adamw.v", &[1][..]),
+            ("head.weight.adamw.m", &[1, 3][..]),
+            ("head.weight.adamw.v", &[1, 3][..]),
+            ("hidden.0.bias.adamw.m", &[3][..]),
+            ("hidden.0.bias.adamw.v", &[3][..]),
+            ("hidden.0.weight.adamw.m", &[3, 2][..]),
+            ("hidden.0.weight.adamw.v", &[3, 2][..]),
+        ],
+        "every moment carries its parameter's shape"
     );
 
     let total: usize = state.tensors.iter().map(|t| t.data.len()).sum();
@@ -748,8 +778,12 @@ fn moment_shaped_tensor_at_a_parameter_name_rejects() {
     match error {
         OptimizerStateError::PartialParameters { detail } => {
             assert!(
-                detail.contains("head.bias"),
-                "names the offending parameter: {detail}"
+                detail.contains("found 1 of 4"),
+                "reports the incomplete parameter set: {detail}"
+            );
+            assert!(
+                !detail.contains("missing head.bias"),
+                "head.bias is present; only its siblings are missing: {detail}"
             );
         }
         other => panic!("expected PartialParameters, got {other:?}"),
