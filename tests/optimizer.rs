@@ -18,9 +18,10 @@ use katakuri::digest::artifact_sha256;
 use katakuri::error::{KatakuriError, NonfiniteKind};
 use katakuri::model::{Activation, MlpLayerSpec, MlpSpec};
 use katakuri::optimizer::{
-    META_OPTIMIZER, META_OPTIMIZER_STATE_VERSION, META_STEP, MomentKind, OPTIMIZER_ADAMW,
-    OPTIMIZER_STATE_VERSION, OptimizerState, OptimizerStateError, SUFFIX_FIRST_MOMENT,
-    SUFFIX_SECOND_MOMENT, expected_optimizer_tensors, load_optimizer_state, moment_name,
+    MAX_DIAGNOSTIC_EXCERPT_BYTES, MAX_DIAGNOSTIC_SHAPE_DIMS, META_OPTIMIZER,
+    META_OPTIMIZER_STATE_VERSION, META_STEP, MomentKind, OPTIMIZER_ADAMW, OPTIMIZER_STATE_VERSION,
+    OptimizerState, OptimizerStateError, SUFFIX_FIRST_MOMENT, SUFFIX_SECOND_MOMENT,
+    bounded_excerpt, expected_optimizer_tensors, load_optimizer_state, moment_name, shape_excerpt,
     split_moment_name,
 };
 use katakuri::safetensors::Dtype;
@@ -567,8 +568,11 @@ fn moment_shape_mismatch_rejects() {
             actual,
         } => {
             assert_eq!(tensor, "hidden.0.bias.adamw.m");
-            assert_eq!(expected, vec![3], "the parameter's shape");
-            assert_eq!(actual, vec![2]);
+            assert_eq!(
+                expected, "[3]",
+                "the parameter's shape, bounded for diagnosis"
+            );
+            assert_eq!(actual, "[2]");
         }
         other => panic!("expected MomentShapeMismatch, got {other:?}"),
     }
@@ -1066,8 +1070,8 @@ fn unexpected_tensor_name_diagnostic_is_bounded() {
     ));
     assert_bounded(&error);
     assert!(
-        error.to_string().contains("100000"),
-        "the true name length is stamped: {}",
+        error.to_string().contains("100008"),
+        "the true name length is stamped (100_000 + the 8-byte suffix): {}",
         error
     );
 }
@@ -1203,7 +1207,7 @@ fn malformed_declared_spec_is_not_a_mismatch() {
             &spec,
         );
         assert!(
-            !matches!(error, OptimizerStateError::SpecMismatch { .. }),
+            matches!(error, OptimizerStateError::MalformedSpecMetadata { .. }),
             "a malformed declared spec is its own typed error, not a mismatch ({tag}): {error:?}"
         );
         assert_bounded(&error);
@@ -1233,8 +1237,89 @@ fn malformed_declared_spec_diagnostic_is_bounded() {
         &spec,
     );
     assert!(
-        !matches!(error, OptimizerStateError::SpecMismatch { .. }),
+        matches!(error, OptimizerStateError::MalformedSpecMetadata { .. }),
         "typed as a malformed spec: {error:?}"
     );
     assert_bounded(&error);
+}
+
+// ── The bounded-excerpt helper itself ─────────────────────────────
+
+#[test]
+fn bounded_excerpt_passes_short_printable_input_through() {
+    assert_eq!(bounded_excerpt(""), "");
+    assert_eq!(bounded_excerpt("adamw"), "adamw");
+    assert_eq!(bounded_excerpt("42"), "42");
+}
+
+#[test]
+fn bounded_excerpt_truncates_at_the_cap_and_stamps_the_true_length() {
+    let at_cap = "x".repeat(MAX_DIAGNOSTIC_EXCERPT_BYTES);
+    assert_eq!(
+        bounded_excerpt(&at_cap),
+        at_cap,
+        "input exactly at the cap is not truncated and is not length-stamped"
+    );
+
+    let above = "x".repeat(MAX_DIAGNOSTIC_EXCERPT_BYTES + 1);
+    let excerpt = bounded_excerpt(&above);
+    assert!(
+        excerpt.ends_with(&format!("... ({} bytes)", above.len())),
+        "true byte length is stamped: {excerpt}"
+    );
+    assert!(
+        excerpt.starts_with(&at_cap),
+        "the leading bytes are kept verbatim: {excerpt}"
+    );
+}
+
+#[test]
+fn bounded_excerpt_never_splits_a_multibyte_char() {
+    // 2 bytes per char, an odd cap → a naive &text[..cap] would panic.
+    let text = "é".repeat(200);
+    let excerpt = bounded_excerpt(&text);
+    assert!(
+        excerpt.is_char_boundary(excerpt.len()),
+        "valid UTF-8 by construction"
+    );
+    let kept = excerpt
+        .split_once("...")
+        .map_or(excerpt.as_str(), |(head, _)| head);
+    assert_eq!(
+        kept.len() % 2,
+        0,
+        "the kept prefix is a whole number of 2-byte chars: {kept:?}"
+    );
+    assert!(excerpt.ends_with("(400 bytes)"), "{excerpt}");
+}
+
+#[test]
+fn bounded_excerpt_escapes_control_characters() {
+    let excerpt = bounded_excerpt("a\nb\tc\u{0}");
+    assert!(!excerpt.contains('\n'), "{excerpt:?}");
+    assert!(!excerpt.contains('\t'), "{excerpt:?}");
+    assert!(!excerpt.contains('\u{0}'), "{excerpt:?}");
+    assert!(excerpt.starts_with("a\\nb"), "{excerpt:?}");
+}
+
+#[test]
+fn shape_excerpt_caps_the_rank_and_stamps_the_true_rank() {
+    assert_eq!(shape_excerpt(&[]), "[]");
+    assert_eq!(shape_excerpt(&[3]), "[3]");
+    assert_eq!(shape_excerpt(&[3, 2]), "[3, 2]");
+    assert_eq!(
+        shape_excerpt(&[1; MAX_DIAGNOSTIC_SHAPE_DIMS]),
+        format!("[{}]", ["1"; MAX_DIAGNOSTIC_SHAPE_DIMS].join(", ")),
+        "a shape at the cap renders fully, with no rank stamp"
+    );
+    let long = shape_excerpt(&vec![1; 100_000]);
+    assert!(
+        long.ends_with("(100000 dims)"),
+        "the true rank is stamped: {long}"
+    );
+    assert!(
+        long.len() < 256,
+        "bounded rendering regardless of rank: {} bytes",
+        long.len()
+    );
 }

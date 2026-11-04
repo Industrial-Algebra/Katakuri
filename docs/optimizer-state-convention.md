@@ -100,9 +100,14 @@ Rules:
 - `step` is **metadata only** — never a per-tensor, never inferred from a
   tensor's contents. `step = 0` is legal (a resume before the first update).
 - Every `ia.*` key obeys the S5 metadata convention: unknown `ia.*` keys
-  reject (`UnknownIaMetadata`). When `ia.spec` is present it must equal the
+  reject (`UnknownIaMetadata`). When `ia.spec` is present it must denote the
   caller's spec, otherwise `SpecMismatch` — state that belongs to a different
-  architecture is a silent-failure generator.
+  architecture is a silent-failure generator. Agreement is **semantic**: the
+  declared document is parsed and compared in canonical form (the same
+  canonical JSON `ia.schema-hash` digests), so whitespace, key order, and any
+  tolerated extra field are irrelevant. A declaration that is not a valid spec
+  at all is `MalformedSpecMetadata` — its own typed failure, never a
+  mismatch.
 - Declared hashes are verified when the trust policy asks:
   `verify_model_hash` checks `ia.model-hash` against the data section,
   `verify_schema_hash` checks `ia.schema-hash` against the caller's spec's
@@ -189,13 +194,36 @@ failures.
 | `UnexpectedTensor { name }` | outside the derived set; nested/stray suffixes (§2, §6) |
 | `PartialParameters { detail }` | incomplete parameter set alongside moments (§6) |
 | `ParameterMismatch { tensor, detail }` | carried parameter ≠ spec dtype/shape |
-| `MomentShapeMismatch { tensor, expected, actual }` | moment ≠ parameter shape (§3) |
+| `MomentShapeMismatch { tensor, expected, actual }` | moment ≠ parameter shape (§3); `expected`/`actual` are bounded renderings (§8.1) |
 | `MomentDtypeMismatch { tensor, expected, actual }` | moment ≠ parameter dtype (§3) |
 | `MissingMetadata { key }` | required optimizer key absent (§4) |
 | `MalformedMetadata { key, detail }` | version/step does not parse (§4) |
 | `UnsupportedStateVersion { found }` | version ≠ 1 (§4) |
 | `UnsupportedOptimizer { found }` | optimizer ≠ `adamw` (§4) |
-| `SpecMismatch { detail }` | declared `ia.spec` ≠ the caller's spec (§4) |
+| `SpecMismatch { detail }` | declared `ia.spec` denotes a different spec (§4) |
+| `MalformedSpecMetadata { detail }` | declared `ia.spec` is not a valid spec (§4) |
+
+### 8.1 Bounded diagnostics
+
+A rejection must never copy an unbounded input just to say "rejected". The
+header is allowed to be 100 MB and S1 bounds neither a tensor name's length
+nor a shape's rank (`[1, 1, …]` with 100,000 dims is a legal shape with a
+4-byte span), so every *untrusted* value this module quotes is bounded:
+
+| Untrusted input | Rendering |
+|---|---|
+| metadata value, tensor name, malformed spec detail | `bounded_excerpt`: ≤ `MAX_DIAGNOSTIC_EXCERPT_BYTES` (64) input bytes, truncated on a UTF-8 boundary, control characters escaped (a diagnostic stays one line), true byte length stamped when truncated |
+| shape | `shape_excerpt`: ≤ `MAX_DIAGNOSTIC_SHAPE_DIMS` (8) dims, true rank stamped when truncated |
+
+`bounded_excerpt` is public: consumers writing their own diagnostics against
+this convention use the same cap rather than inventing one.
+
+Scope of the guarantee: every string field of `OptimizerStateError` that can
+originate in the file is bounded, and the only `Vec`-typed fields left are
+`usize`/enum data. `PartialParameters`'s `detail` names **spec** parameters,
+so it is bounded by the spec grammar (at most 18 names of ~16 bytes), never
+by file input. S5 failures pass through as `Checkpoint(KatakuriError)` and
+keep S5's own diagnostics, which are outside this convention's guarantee.
 
 ## 9. Reference API
 

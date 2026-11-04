@@ -114,6 +114,77 @@ pub const OPTIMIZER_ADAMW: &str = "adamw";
 /// The one convention version this module validates.
 pub const OPTIMIZER_STATE_VERSION: u32 = 1;
 
+/// Byte cap on untrusted text quoted into a diagnostic (the
+/// `MAX_DIAGNOSTIC_NAME_BYTES` doctrine: a rejection never copies an
+/// unbounded input just to say "rejected").
+///
+/// Metadata values and tensor names come straight out of the file, and a
+/// safetensors header is allowed to be 100 MB. Quoting one verbatim turns a
+/// one-line rejection into a 100 KB allocation (PR #22 round 1, P2a).
+pub const MAX_DIAGNOSTIC_EXCERPT_BYTES: usize = 64;
+
+/// Largest shape rank rendered into a diagnostic.
+///
+/// S1 does not bound a shape's rank — `[1, 1, … 1]` (100,000 dims) is a legal
+/// shape with a 4-byte span — so `{:?}` of an untrusted shape is as unbounded
+/// as an untrusted string. Rendered shapes keep at most this many dims and
+/// stamp the true rank.
+pub const MAX_DIAGNOSTIC_SHAPE_DIMS: usize = 8;
+
+/// Render untrusted text for a diagnostic.
+///
+/// At most [`MAX_DIAGNOSTIC_EXCERPT_BYTES`] input bytes are kept (truncated on
+/// a UTF-8 boundary, so multi-byte characters are never split), control
+/// characters are escaped so a diagnostic stays one line, and a truncated
+/// excerpt is stamped with the input's true byte length. Short printable
+/// input is returned unchanged.
+///
+/// Bounded output: escaping can expand one control character to as much as
+/// `\u{10ffff}`, so the result is at most
+/// `MAX_DIAGNOSTIC_EXCERPT_BYTES × 10 + ~32` bytes.
+#[must_use]
+pub fn bounded_excerpt(text: &str) -> String {
+    let (kept, truncated) = if text.len() <= MAX_DIAGNOSTIC_EXCERPT_BYTES {
+        (text, false)
+    } else {
+        let mut end = MAX_DIAGNOSTIC_EXCERPT_BYTES;
+        while end > 0 && !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        (&text[..end], true)
+    };
+    let mut out = String::with_capacity(kept.len() + 32);
+    out.extend(kept.chars().flat_map(char::escape_debug));
+    if truncated {
+        let true_len = format!("... ({} bytes)", text.len());
+        out.push_str(&true_len);
+    }
+    out
+}
+
+/// Render a shape for a diagnostic: at most [`MAX_DIAGNOSTIC_SHAPE_DIMS`]
+/// dims, with the true rank stamped when truncated (`[1, 1, ...] (100000
+/// dims)`). Short shapes render exactly as `{:?}` renders them.
+#[must_use]
+pub fn shape_excerpt(shape: &[usize]) -> String {
+    let shown = shape.len().min(MAX_DIAGNOSTIC_SHAPE_DIMS);
+    let mut out = String::with_capacity(8 * 8 + 24);
+    out.push('[');
+    for (index, dim) in shape[..shown].iter().enumerate() {
+        if index > 0 {
+            out.push_str(", ");
+        }
+        out.push_str(&dim.to_string());
+    }
+    if shape.len() > shown {
+        let tail = format!(", ...] ({} dims)", shape.len());
+        out.push_str(&tail);
+    } else {
+        out.push(']');
+    }
+    out
+}
+
 /// Which of AdamW's two moments a tensor is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MomentKind {
@@ -282,7 +353,7 @@ impl OptimizerState {
             .parse()
             .map_err(|_| OptimizerStateError::MalformedMetadata {
                 key: META_OPTIMIZER_STATE_VERSION.to_string(),
-                detail: format!("expected a u32, found '{version}'"),
+                detail: format!("expected a u32, found '{}'", bounded_excerpt(version)),
             })?;
         if version != OPTIMIZER_STATE_VERSION {
             return Err(OptimizerStateError::UnsupportedStateVersion { found: version });
@@ -291,7 +362,7 @@ impl OptimizerState {
         let optimizer = self.required_meta(META_OPTIMIZER)?;
         if optimizer != OPTIMIZER_ADAMW {
             return Err(OptimizerStateError::UnsupportedOptimizer {
-                found: optimizer.to_string(),
+                found: bounded_excerpt(optimizer),
             });
         }
 
@@ -300,18 +371,40 @@ impl OptimizerState {
             .parse()
             .map_err(|_| OptimizerStateError::MalformedMetadata {
                 key: META_STEP.to_string(),
-                detail: format!("expected a u64, found '{step}'"),
+                detail: format!("expected a u64, found '{}'", bounded_excerpt(step)),
             })?;
 
         // The artifact is bound to a parameter checkpoint. When it declares
         // `ia.spec` itself, that declaration must agree — an optimizer state
         // for a different architecture is a silent-failure generator.
+        //
+        // Agreement is SEMANTIC, not textual (PR #22 round 1, P2b): the
+        // declared document is parsed and compared in canonical form — the
+        // same canonical JSON `ia.schema-hash` digests — so whitespace, key
+        // order, and any tolerated extra field cannot produce a mismatch.
+        // A declaration that is not a valid spec is its own typed failure,
+        // never a mismatch.
         if let Some(declared) = self.metadata.get(META_SPEC) {
-            let expected = spec.canonical_json();
-            if *declared != expected {
+            let declared = match MlpSpec::from_json(declared) {
+                Ok(parsed) => parsed,
+                Err(KatakuriError::MlpSpecParse { detail }) => {
+                    return Err(OptimizerStateError::MalformedSpecMetadata {
+                        detail: bounded_excerpt(&detail),
+                    });
+                }
+                Err(other) => {
+                    // Defensive: `MlpSpec::from_json` only returns
+                    // `MlpSpecParse` today; a future variant must not leak an
+                    // unbounded message either.
+                    return Err(OptimizerStateError::MalformedSpecMetadata {
+                        detail: bounded_excerpt(&other.to_string()),
+                    });
+                }
+            };
+            if declared.canonical_json() != spec.canonical_json() {
                 return Err(OptimizerStateError::SpecMismatch {
-                    detail: "checkpoint metadata 'ia.spec' does not match the caller's \
-                             parameter spec"
+                    detail: "checkpoint metadata 'ia.spec' names a different architecture \
+                             than the caller's parameter spec"
                         .to_string(),
                 });
             }
@@ -337,7 +430,7 @@ impl OptimizerState {
                 let name = moment_name(param, moment);
                 if !present.contains(name.as_str()) {
                     return Err(OptimizerStateError::MissingMoment {
-                        param: param.clone(),
+                        param: bounded_excerpt(param),
                         moment,
                     });
                 }
@@ -357,7 +450,7 @@ impl OptimizerState {
                 continue;
             }
             return Err(OptimizerStateError::UnexpectedTensor {
-                name: tensor.name.clone(),
+                name: bounded_excerpt(&tensor.name),
             });
         }
         if params_found != 0 && params_found != param_names.len() {
@@ -386,11 +479,12 @@ impl OptimizerState {
                     .expect("presence and completeness already established");
                 if tensor.dtype != Dtype::F32 || tensor.shape != *shape {
                     return Err(OptimizerStateError::ParameterMismatch {
-                        tensor: param.clone(),
+                        tensor: bounded_excerpt(param),
                         detail: format!(
-                            "expected dtype F32 and shape {shape:?}, found dtype {:?} and \
-                             shape {:?}",
-                            tensor.dtype, tensor.shape
+                            "expected dtype F32 and shape {}, found dtype {:?} and shape {}",
+                            shape_excerpt(shape),
+                            tensor.dtype,
+                            shape_excerpt(&tensor.shape)
                         ),
                     });
                 }
@@ -402,16 +496,16 @@ impl OptimizerState {
                     .expect("presence already established above");
                 if tensor.dtype != Dtype::F32 {
                     return Err(OptimizerStateError::MomentDtypeMismatch {
-                        tensor: name,
+                        tensor: bounded_excerpt(&name),
                         expected: Dtype::F32,
                         actual: tensor.dtype,
                     });
                 }
                 if tensor.shape != *shape {
                     return Err(OptimizerStateError::MomentShapeMismatch {
-                        tensor: name,
-                        expected: shape.clone(),
-                        actual: tensor.shape.clone(),
+                        tensor: bounded_excerpt(&name),
+                        expected: shape_excerpt(shape),
+                        actual: shape_excerpt(&tensor.shape),
                     });
                 }
             }
@@ -581,6 +675,18 @@ fn scan_nonfinite(tensors: &[ParsedTensor]) -> Result<(), KatakuriError> {
 /// hashes, nonfinite values) arrive as [`Self::Checkpoint`] — the convention
 /// adds no second vocabulary for them. The remaining variants are the
 /// convention's own rules, each naming the tensor or metadata key at fault.
+///
+/// # Bounded diagnostics
+///
+/// Every string this enum carries that could originate in the file (metadata
+/// values, tensor names, a malformed declared spec) is a
+/// [`bounded_excerpt`]: at most [`MAX_DIAGNOSTIC_EXCERPT_BYTES`] input bytes,
+/// UTF-8-boundary truncated, control-escaped, true length stamped when
+/// truncated. Untrusted shapes are rendered by [`shape_excerpt`]: at most
+/// [`MAX_DIAGNOSTIC_SHAPE_DIMS`] dims, true rank stamped. The only unbounded
+/// text left is [`Self::PartialParameters`]'s `detail`, which names spec
+/// parameters — bounded by the spec grammar itself (`ia-mlp` derives at most
+/// 18 names of at most ~16 bytes), never by file input.
 #[derive(Debug, Error)]
 pub enum OptimizerStateError {
     /// An S5 checkpoint failure: file/policy checks, S1 parse, `ia.*`
@@ -634,14 +740,20 @@ pub enum OptimizerStateError {
 
     /// A moment's shape differs from its parameter's shape (no transposes at
     /// rest, no reshapes).
-    #[error("moment '{tensor}': wrong shape (expected {expected:?}, found {actual:?})")]
+    ///
+    /// `expected`/`actual` are bounded diagnostic renderings
+    /// ([`shape_excerpt`]'s form: at most [`MAX_DIAGNOSTIC_SHAPE_DIMS`] dims,
+    /// true rank stamped) rather than shape vectors — an untrusted rank is
+    /// unbounded. Read the shape from the tensor itself
+    /// ([`OptimizerState::tensor`]) when you need it programmatically.
+    #[error("moment '{tensor}': wrong shape (expected {expected}, found {actual})")]
     MomentShapeMismatch {
-        /// The offending moment tensor.
+        /// The offending moment tensor (bounded excerpt).
         tensor: String,
-        /// The parameter's shape.
-        expected: Vec<usize>,
-        /// The shape found in the file.
-        actual: Vec<usize>,
+        /// The parameter's shape, bounded for diagnosis.
+        expected: String,
+        /// The shape found in the file, bounded for diagnosis.
+        actual: String,
     },
 
     /// A moment's dtype differs from its parameter's dtype.
@@ -688,10 +800,21 @@ pub enum OptimizerStateError {
     },
 
     /// The artifact declares an `ia.spec` that is not the caller's spec: the
-    /// state does not belong to this parameter checkpoint.
+    /// state does not belong to this parameter checkpoint. Comparison is
+    /// semantic (canonical form), so whitespace and key order never land
+    /// here.
     #[error("optimizer state does not belong to this model: {detail}")]
     SpecMismatch {
         /// What diverged.
+        detail: String,
+    },
+
+    /// The artifact declares an `ia.spec` that is not a valid spec at all.
+    /// Distinct from [`Self::SpecMismatch`]: the declaration cannot be
+    /// compared, so it is malformed metadata rather than a disagreement.
+    #[error("optimizer metadata 'ia.spec' is not a valid spec: {detail}")]
+    MalformedSpecMetadata {
+        /// The parser's bounded description of the divergence.
         detail: String,
     },
 }
