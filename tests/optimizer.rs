@@ -1323,3 +1323,50 @@ fn shape_excerpt_caps_the_rank_and_stamps_the_true_rank() {
         long.len()
     );
 }
+
+// ── Round 2 review: PartialParameters name-list bound (P2) ────────
+//
+// `MlpSpec`'s fields are public, so the "spec-grammar-bounded" argument only
+// covers parse-valid specs: a hand-built 10,000-layer spec is legal input to
+// the public API and must not be able to inflate a diagnostic. The invariant
+// is provenance-free: NO constructor of `OptimizerStateError` may produce an
+// unbounded message, whatever built the spec.
+
+#[test]
+fn partial_parameters_diagnostic_is_bounded_for_hand_built_specs() {
+    let layers = 10_000;
+    let spec = MlpSpec {
+        input_width: 1,
+        hidden: (0..layers).map(|_| MlpLayerSpec { width: 1 }).collect(),
+        head: MlpLayerSpec { width: 1 },
+        hidden_activation: Activation::Relu,
+    };
+    // 2 * 10_000 + 2 parameters; complete moments for all of them, plus one
+    // lone parameter tensor -> 20_001 missing names to render.
+    let error = expect_error(
+        &StateBuilder::new(spec.clone())
+            // No `ia.spec`: a hand-built spec is not a legal *document*, so
+            // declaring it would (correctly) fail as MalformedSpecMetadata
+            // first. The missing-name list is the code path under test.
+            .remove_meta("ia.spec")
+            .set_tensor("head.bias", Dtype::F32, vec![1], f32_bytes(1, 0.0))
+            .build(),
+        "many-layers",
+        &permissive_policy(),
+        &spec,
+    );
+    assert!(
+        matches!(error, OptimizerStateError::PartialParameters { .. }),
+        "expected PartialParameters, got a different variant"
+    );
+    assert_bounded(&error);
+    let message = error.to_string();
+    assert!(
+        message.contains("found 1 of 20002"),
+        "the true parameter count is stamped: {message}"
+    );
+    assert!(
+        message.contains("19997 more"),
+        "the true remainder of the capped name list is stamped: {message}"
+    );
+}
