@@ -51,6 +51,12 @@
 //!   loading under an explicit trust policy (regular file, byte cap, metadata
 //!   schema/model hashes, shape agreement, optional nonfinite scan). The one
 //!   place values are inspected, and only when the policy asks (S5).
+//! - `optimizer` (optional `std` + `digest` features) — the optimizer-state
+//!   checkpoint convention: AdamW moments namespaced per parameter
+//!   (`.adamw.m` / `.adamw.v`), all-or-nothing completeness, metadata
+//!   version/step, canonical lexicographic order. Validation composes the
+//!   `checkpoint` trust policy; nothing here computes (S6). See
+//!   `docs/optimizer-state-convention.md` for the frozen convention.
 //! - `hub` (optional `hub` feature) — model fetch + content-addressed
 //!   cache over plain HTTPS, offline-first; `hub-net` adds the ureq/rustls
 //!   transport. Replaces `hf-hub`. Lands with S4.
@@ -130,6 +136,8 @@ pub mod error;
 pub mod hub;
 pub mod manifest;
 pub mod model;
+#[cfg(all(feature = "std", feature = "digest"))]
+pub mod optimizer;
 pub mod safetensors;
 pub mod tokenizer;
 
